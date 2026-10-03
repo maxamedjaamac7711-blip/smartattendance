@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - SmartAttendance Pro</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5.3 & Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+    <!-- Custom Theme Stylesheet -->
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-custom">
+        <div class="container-fluid px-lg-4">
+            <a class="navbar-brand" asp-controller="Home" asp-action="Index">
+                <div class="brand-icon-box">
+                    <i class="bi bi-person-bounding-box"></i>
+                </div>
+                <span>SmartAttendance</span>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill fs-7 py-1 px-2">PRO</span>
+            </a>
+
+            <button class="navbar-toggler border-0 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+                <i class="bi bi-list fs-2 text-dark"></i>
+            </button>
+
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-3 gap-1">
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Home" asp-action="Index">
+                                    <i class="bi bi-grid-1x2"></i> Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Student" asp-action="Index">
+                                    <i class="bi bi-mortarboard"></i> Students
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Teachers" asp-action="Index">
+                                    <i class="bi bi-person-video3"></i> Teachers
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Classes" asp-action="Index">
+                                    <i class="bi bi-building"></i> Classes
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Faculties" asp-action="Index">
+                                    <i class="bi bi-journal-bookmark"></i> Faculties
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Attendance" asp-action="Index">
+                                    <i class="bi bi-clock-history"></i> Sessions
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Attendance" asp-action="Report">
+                                    <i class="bi bi-graph-up-arrow"></i> Reports
+                                </a>
+                            </li>
+                        }
+                        else if (User.IsInRole("Teacher"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Teachers" asp-action="Dashboard">
+                                    <i class="bi bi-grid-1x2"></i> Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Teachers" asp-action="MyStudents">
+                                    <i class="bi bi-people"></i> My Students
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Attendance" asp-action="Index">
+                                    <i class="bi bi-clock-history"></i> Sessions
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Attendance" asp-action="Start">
+                                    <i class="bi bi-play-circle"></i> Start Session
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Attendance" asp-action="Report">
+                                    <i class="bi bi-bar-chart-line"></i> Reports
+                                </a>
+                            </li>
+                        }
+                        else if (User.IsInRole("Student"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Student" asp-action="Dashboard">
+                                    <i class="bi bi-grid-1x2"></i> Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Student" asp-action="FaceCheckIn">
+                                    <i class="bi bi-camera"></i> Face Check-in
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Student" asp-action="ScanQR">
+                                    <i class="bi bi-qr-code-scan"></i> Scan QR
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Student" asp-action="MyAttendance">
+                                    <i class="bi bi-calendar-check"></i> My Attendance
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Student" asp-action="MyClass">
+                                    <i class="bi bi-mortarboard"></i> My Class
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Student" asp-action="MyProfile">
+                                    <i class="bi bi-person-badge"></i> ID Card
+                                </a>
+                            </li>
+                        }
+                    }
+                </ul>
+
+                <ul class="navbar-nav align-items-center gap-2">
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        var userName = User.Identity.Name ?? "User";
+                        var initial = userName.Length > 0 ? userName.Substring(0, 1).ToUpper() : "U";
+                        var roleName = User.IsInRole("Admin") ? "Admin" : User.IsInRole("Teacher") ? "Teacher" : "Student";
+                        var roleBadgeClass = User.IsInRole("Admin") ? "badge-soft-danger" : User.IsInRole("Teacher") ? "badge-soft-primary" : "badge-soft-success";
+
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle d-flex align-items-center gap-2 p-1 pe-2 rounded-pill bg-light border" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <div class="user-avatar-bubble" style="width: 32px; height: 32px; font-size: 0.85rem;">
+                                    @initial
+                                </div>
+                                <div class="d-none d-sm-block text-start me-1">
+                                    <span class="d-block fw-semibold text-dark lh-1" style="font-size: 0.85rem;">@userName</span>
+                                    <span class="badge @roleBadgeClass nav-role-badge mt-1" style="font-size: 0.65rem;">@roleName</span>
+                                </div>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-3 mt-2" style="min-width: 200px;">
+                                <li class="px-3 py-2 border-bottom">
+                                    <div class="fw-bold text-dark">@userName</div>
+                                    <small class="text-muted">Role: @roleName</small>
+                                </li>
+                                @if (User.IsInRole("Student"))
+                                {
+                                    <li><a class="dropdown-item py-2" asp-controller="Student" asp-action="MyProfile"><i class="bi bi-person-badge me-2 text-primary"></i> Digital ID Card</a></li>
+                                    <li><a class="dropdown-item py-2" asp-controller="Student" asp-action="MyAttendance"><i class="bi bi-calendar-check me-2 text-success"></i> Attendance History</a></li>
+                                }
+                                else if (User.IsInRole("Teacher"))
+                                {
+                                    <li><a class="dropdown-item py-2" asp-controller="Teachers" asp-action="Dashboard"><i class="bi bi-grid me-2 text-primary"></i> Workspace</a></li>
+                                    <li><a class="dropdown-item py-2" asp-controller="Teachers" asp-action="MyStudents"><i class="bi bi-people me-2 text-info"></i> Class Students</a></li>
+                                }
+                                else
+                                {
+                                    <li><a class="dropdown-item py-2" asp-controller="Home" asp-action="Index"><i class="bi bi-shield-check me-2 text-danger"></i> Admin Console</a></li>
+                                }
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form asp-controller="Account" asp-action="Logout" method="post" class="m-0 p-0">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="dropdown-item py-2 text-danger">
+                                            <i class="bi bi-box-arrow-right me-2"></i> Log Out
+                                        </button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="nav-item">
+                            <a class="btn btn-primary btn-sm px-3" asp-controller="Account" asp-action="Login">
+                                <i class="bi bi-box-arrow-in-right"></i> Sign In
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container Content -->
+    <main class="container-fluid px-lg-4 py-4 flex-grow-1">
+        <!-- Notification Alerts -->
+        @if (TempData["Message"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show rounded-4 border-0 shadow-sm d-flex align-items-center gap-3 mb-4" role="alert">
+                <i class="bi bi-check-circle-fill text-success fs-4"></i>
+                <div class="flex-grow-1">
+                    <strong>Success!</strong> @TempData["Message"]
+                </div>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["Error"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show rounded-4 border-0 shadow-sm d-flex align-items-center gap-3 mb-4" role="alert">
+                <i class="bi bi-exclamation-triangle-fill text-danger fs-4"></i>
+                <div class="flex-grow-1">
+                    <strong>Notice:</strong> @TempData["Error"]
+                </div>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @RenderBody()
+    </main>
+
+    <!-- Professional Modern Footer -->
+    <footer class="footer-custom">
+        <div class="container-fluid px-lg-4">
+            <div class="row align-items-center gy-2">
+                <div class="col-md-6 text-center text-md-start">
+                    <span class="fw-bold text-dark">SmartAttendance Pro</span> &copy; @DateTime.UtcNow.Year &mdash; AI Face Recognition & QR Check-in Platform
+                </div>
+                <div class="col-md-6 text-center text-md-end">
+                    <span class="badge badge-soft-success badge-pill me-2">
+                        <span class="pulse-indicator me-1"></span> Systems Operational
+                    </span>
+                    <span class="text-muted small">v2.5 Enterprise</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

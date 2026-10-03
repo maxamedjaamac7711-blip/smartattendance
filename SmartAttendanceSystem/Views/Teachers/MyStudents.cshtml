@@ -1,0 +1,123 @@
+@model IEnumerable<SmartAttendanceSystem.Properties.Model.Student>
+
+@{
+    ViewData["Title"] = "My Class Students";
+    var students = Model.ToList();
+    var className = ViewBag.ClassName as string ?? "My Class";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <div class="d-flex align-items-center gap-2">
+            <h2 class="fw-bold mb-0">@className &mdash; Student Roster</h2>
+            <span class="badge badge-soft-primary badge-pill">@students.Count Students</span>
+        </div>
+        <p class="text-muted small mb-0 mt-1">Students enrolled in your class cohort with biometrics verification status</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Dashboard" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Workspace
+        </a>
+        <button class="btn btn-primary btn-sm" onclick="window.print()">
+            <i class="bi bi-printer"></i> Print Roster
+        </button>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header card-header-clean d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0 fw-bold">Class List</h5>
+        <div class="d-flex align-items-center gap-2">
+            <input type="text" id="rosterSearch" class="form-control form-control-sm" placeholder="Search by student name or ID..." style="width: 260px;" />
+        </div>
+    </div>
+    <div class="card-body p-0">
+        @if (students.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-modern" id="rosterTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Student</th>
+                            <th>Enrollment ID</th>
+                            <th>Biometrics Status</th>
+                            <th class="text-end">Roster Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ int index = 1; }
+                        @foreach (var s in students)
+                        {
+                            var initial = s.Name.Length > 0 ? s.Name.Substring(0, 1).ToUpper() : "S";
+                            var hasFace = !string.IsNullOrEmpty(s.FaceEmbedding);
+
+                            <tr>
+                                <td class="text-muted small">@index</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        @if (!string.IsNullOrEmpty(s.FaceImagePath))
+                                        {
+                                            <img src="@s.FaceImagePath" alt="@s.Name" class="rounded-circle border" style="width: 38px; height: 38px; object-fit: cover;" />
+                                        }
+                                        else
+                                        {
+                                            <div class="user-avatar-bubble" style="width: 38px; height: 38px; font-size: 0.85rem;">
+                                                @initial
+                                            </div>
+                                        }
+                                        <div>
+                                            <div class="fw-semibold text-dark">@s.Name</div>
+                                            <small class="text-muted">Username: @(s.User?.UserName ?? s.EnrollmentNumber)</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="font-monospace fw-semibold text-dark">@s.EnrollmentNumber</span>
+                                </td>
+                                <td>
+                                    @if (hasFace)
+                                    {
+                                        <span class="badge badge-soft-success badge-pill">
+                                            <i class="bi bi-shield-check"></i> Face Enrolled
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-soft-warning badge-pill">
+                                            <i class="bi bi-exclamation-triangle"></i> Not Enrolled
+                                        </span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <span class="badge badge-soft-dark badge-pill">Active Enrolled</span>
+                                </td>
+                            </tr>
+                            index++;
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-people fs-1 d-block mb-2"></i>
+                <h6>No students enrolled in this cohort yet.</h6>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('rosterSearch')?.addEventListener('keyup', function () {
+            const query = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#rosterTable tbody tr');
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
+            });
+        });
+    </script>
+}

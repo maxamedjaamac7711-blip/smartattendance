@@ -1,0 +1,243 @@
+@{
+    ViewData["Title"] = "Attendance Report";
+    var stats = (dynamic)ViewBag.Stats;
+    var filters = (dynamic)ViewBag.Filters;
+    var classes = ViewBag.Classes as List<SmartAttendanceSystem.Properties.Model.SchoolClass>;
+    var subjects = ViewBag.Subjects as List<string>;
+}
+
+<div class="page-header mb-4">
+    <div class="d-flex align-items-center justify-content-between">
+        <div>
+            <h1 class="page-title mb-1">Attendance Report</h1>
+            <p class="text-muted mb-0">Analytics and export for attendance records</p>
+        </div>
+        <a asp-action="ExportCsv" asp-all-route-data="@filters" class="btn btn-primary">
+            <i class="bi bi-download me-2"></i>Export CSV
+        </a>
+    </div>
+</div>
+
+<!-- Filter Card -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0">
+        <h5 class="fw-semibold mb-0">
+            <i class="bi bi-funnel me-2 text-primary"></i>Filters
+        </h5>
+    </div>
+    <div class="card-body p-4">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label fw-medium small">Start Date</label>
+                <input type="date" name="startDate" class="form-control"
+                       value="@(filters.startDate?.ToString("yyyy-MM-dd") ?? "")" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-medium small">End Date</label>
+                <input type="date" name="endDate" class="form-control"
+                       value="@(filters.endDate?.ToString("yyyy-MM-dd") ?? "")" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-medium small">Class</label>
+                @Html.DropDownList("classId", new SelectList(classes, "Id", "Name", filters.classId),
+                    "All Classes", new { @class = "form-select" })
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-medium small">Subject</label>
+                @Html.DropDownList("subject", new SelectList(subjects, filters.subject),
+                    "All Subjects", new { @class = "form-select" })
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-medium small">Method</label>
+                @Html.DropDownList("method", new List<SelectListItem>
+                {
+                    new SelectListItem { Text = "QR Code", Value = "QR", Selected = filters.method == "QR" },
+                    new SelectListItem { Text = "Face Recognition", Value = "Face", Selected = filters.method == "Face" }
+                }, "All Methods", new { @class = "form-select" })
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search me-1"></i>Apply Filters
+                </button>
+                <a asp-action="Report" class="btn btn-ghost">
+                    <i class="bi bi-x me-1"></i>Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:var(--primary-gradient);">
+                <i class="bi bi-journal-text"></i>
+            </div>
+            <div class="stat-value">@stats.totalRecords</div>
+            <div class="stat-label">Total Records</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:linear-gradient(135deg,#22c55e,#16a34a);">
+                <i class="bi bi-check-circle"></i>
+            </div>
+            <div class="stat-value text-success">@stats.presentCount</div>
+            <div class="stat-label">Present</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);">
+                <i class="bi bi-qr-code"></i>
+            </div>
+            <div class="stat-value text-info">@stats.qrCount</div>
+            <div class="stat-label">QR Code Check-ins</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706);">
+                <i class="bi bi-person-bounding-box"></i>
+            </div>
+            <div class="stat-value text-warning">@stats.faceCount</div>
+            <div class="stat-label">Face Recognition</div>
+        </div>
+    </div>
+</div>
+
+<!-- Daily Attendance Chart -->
+@if (stats.dailyStats != null && ((IEnumerable<dynamic>)stats.dailyStats).Any())
+{
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0">
+            <h5 class="fw-semibold mb-0">
+                <i class="bi bi-bar-chart-line me-2 text-primary"></i>Daily Attendance Trend
+            </h5>
+        </div>
+        <div class="card-body p-4">
+            <div style="height: 280px;">
+                <canvas id="dailyChart"></canvas>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Student Statistics Table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0 d-flex align-items-center justify-content-between">
+        <h5 class="fw-semibold mb-0">
+            <i class="bi bi-table me-2 text-primary"></i>Student Attendance Summary
+        </h5>
+        <div>
+            <input type="text" id="studentSearch" class="form-control form-control-sm"
+                   placeholder="Search students…" style="width:200px;" />
+        </div>
+    </div>
+    <div class="card-body p-0 pt-3">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="summaryTable">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Student</th>
+                        <th>Enrollment</th>
+                        <th>Class</th>
+                        <th>Sessions</th>
+                        <th>Present</th>
+                        <th>Absent</th>
+                        <th>Rate</th>
+                        <th>QR</th>
+                        <th class="pe-4">Face</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in stats.studentStats)
+                    {
+                        var absent = s.TotalSessions - s.PresentCount;
+                        var pct = s.TotalSessions > 0 ? (double)s.PresentCount / s.TotalSessions * 100 : 0;
+                        <tr>
+                            <td class="ps-4 fw-medium">@s.Name</td>
+                            <td><code class="small">@s.EnrollmentNumber</code></td>
+                            <td><span class="badge bg-light text-dark border">@s.ClassName</span></td>
+                            <td>@s.TotalSessions</td>
+                            <td class="text-success fw-semibold">@s.PresentCount</td>
+                            <td class="text-danger fw-semibold">@absent</td>
+                            <td style="min-width:160px;">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="progress flex-grow-1" style="height:6px; border-radius:999px;">
+                                        <div class="progress-bar @(pct >= 75 ? "bg-success" : pct >= 50 ? "bg-warning" : "bg-danger")"
+                                             role="progressbar"
+                                             style="width: @pct.ToString("F0")%; border-radius:999px;">
+                                        </div>
+                                    </div>
+                                    <small class="fw-semibold @(pct >= 75 ? "text-success" : pct >= 50 ? "text-warning" : "text-danger")">
+                                        @pct.ToString("F1")%
+                                    </small>
+                                </div>
+                            </td>
+                            <td>@s.QRCount</td>
+                            <td class="pe-4">@s.FaceCount</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Daily Chart
+        const dailyData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(stats.dailyStats));
+
+        if (dailyData && dailyData.length > 0) {
+            const ctx = document.getElementById('dailyChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dailyData.map(d => new Date(d.date).toLocaleDateString()),
+                    datasets: [{
+                        label: 'Present',
+                        data: dailyData.map(d => d.present),
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34,197,94,0.08)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#22c55e'
+                    }, {
+                        label: 'Total',
+                        data: dailyData.map(d => d.total),
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99,102,241,0.06)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#6366f1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.04)' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Table search
+        document.getElementById('studentSearch').addEventListener('input', function () {
+            const q = this.value.toLowerCase();
+            document.querySelectorAll('#summaryTable tbody tr').forEach(r => {
+                r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+            });
+        });
+    </script>
+}

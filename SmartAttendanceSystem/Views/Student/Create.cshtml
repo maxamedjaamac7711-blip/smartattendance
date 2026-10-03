@@ -1,0 +1,93 @@
+@model SmartAttendanceSystem.Models.StudentCreateViewModel
+
+@{
+    ViewData["Title"] = "Register Student";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-0">Register New Student</h2>
+                <p class="text-muted small mb-0">Create student account and academic profile</p>
+            </div>
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Back to Directory
+            </a>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 p-md-5">
+                <form asp-action="Create" method="post">
+                    @Html.AntiForgeryToken()
+
+                    <div asp-validation-summary="All" class="alert alert-danger rounded-3 small py-2 mb-4" style="display: @(ViewData.ModelState.IsValid ? "none" : "block")"></div>
+
+                    <h6 class="fw-bold text-uppercase text-primary small mb-3" style="letter-spacing: 0.05em;">Personal & Academic Info</h6>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label asp-for="Name" class="form-label">Full Name</label>
+                            <input asp-for="Name" class="form-control" placeholder="e.g. John Doe" required />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="EnrollmentNumber" class="form-label">Student ID / Enrollment Number</label>
+                            <input asp-for="EnrollmentNumber" class="form-control font-monospace" placeholder="e.g. STU-2026-001" required />
+                            <span asp-validation-for="EnrollmentNumber" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="FacultyId" class="form-label">Faculty / Department</label>
+                            <select asp-for="FacultyId" class="form-select" asp-items="ViewBag.Faculties" required>
+                                <option value="">-- Select Faculty --</option>
+                            </select>
+                            <span asp-validation-for="FacultyId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="ClassId" class="form-label">Class Cohort</label>
+                            <select asp-for="ClassId" class="form-select" asp-items="ViewBag.Classes" required>
+                                <option value="">-- Select Class --</option>
+                            </select>
+                            <span asp-validation-for="ClassId" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-uppercase text-primary small mb-3 border-top pt-3" style="letter-spacing: 0.05em;">Portal Login Credentials</h6>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label asp-for="Username" class="form-label">Portal Username</label>
+                            <input asp-for="Username" class="form-control" placeholder="e.g. jdoe26" required />
+                            <span asp-validation-for="Username" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="Password" class="form-label">Initial Password</label>
+                            <input asp-for="Password" type="password" class="form-control" placeholder="Minimum 6 characters" required />
+                            <span asp-validation-for="Password" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info rounded-3 small py-2 d-flex align-items-center gap-2 mb-4">
+                        <i class="bi bi-info-circle-fill text-info fs-5"></i>
+                        <span>After creating the student, you will be redirected to enroll their facial biometrics.</span>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-check2-circle"></i> Save & Continue to Face Enrollment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

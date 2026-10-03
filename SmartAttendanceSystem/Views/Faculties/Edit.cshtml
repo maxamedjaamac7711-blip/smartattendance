@@ -1,0 +1,71 @@
+@model SmartAttendanceSystem.Properties.Model.Faculty
+
+@{
+    ViewData["Title"] = "Edit Faculty";
+}
+
+<div class="page-header mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <a asp-action="Index" class="btn btn-ghost btn-sm">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div>
+            <h1 class="page-title mb-0">Edit Faculty</h1>
+            <p class="text-muted mb-0 small">Update faculty information</p>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent border-0 pt-4 pb-0 px-4">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="stat-icon" style="background: var(--accent-gradient); width:48px; height:48px; font-size:1.2rem;">
+                        <i class="bi bi-building"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-semibold">Faculty Details</h5>
+                        <small class="text-muted">Edit the faculty record</small>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <form asp-action="Edit" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="Id" />
+
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger mb-3" style="display:none"></div>
+
+                    <div class="mb-4">
+                        <label asp-for="Name" class="form-label fw-medium">
+                            <i class="bi bi-building me-1 text-primary"></i>Faculty Name
+                        </label>
+                        <input asp-for="Name" class="form-control" placeholder="e.g. Faculty of Engineering" />
+                        <span asp-validation-for="Name" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label asp-for="Description" class="form-label fw-medium">
+                            <i class="bi bi-text-left me-1 text-primary"></i>Description
+                        </label>
+                        <textarea asp-for="Description" class="form-control" rows="4"
+                                  placeholder="Brief description of this faculty..."></textarea>
+                        <span asp-validation-for="Description" class="text-danger small"></span>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1">
+                            <i class="bi bi-save me-2"></i>Save Changes
+                        </button>
+                        <a asp-action="Index" class="btn btn-ghost">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

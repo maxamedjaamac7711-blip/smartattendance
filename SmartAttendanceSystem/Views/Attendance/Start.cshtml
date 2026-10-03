@@ -1,0 +1,179 @@
+@{
+    ViewData["Title"] = "Start Attendance Session";
+}
+
+<div class="page-header mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <a asp-action="Index" class="btn btn-ghost btn-sm">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div>
+            <h1 class="page-title mb-0">Start New Session</h1>
+            <p class="text-muted mb-0 small">Configure and launch an attendance session</p>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+
+        <!-- Info Banner -->
+        <div class="alert border-0 mb-4 d-flex align-items-center gap-3"
+             style="background:rgba(99,102,241,0.08); border-radius:12px;">
+            <i class="bi bi-info-circle-fill text-primary fs-5"></i>
+            <div>
+                <strong>Sessions auto-expire</strong> after 15 minutes.
+                Students must check in before the session expires.
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent border-0 pt-4 pb-0 px-4">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="stat-icon" style="background:var(--success-gradient, linear-gradient(135deg,#22c55e,#16a34a)); width:48px; height:48px; font-size:1.2rem;">
+                        <i class="bi bi-play-circle"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-semibold">Session Configuration</h5>
+                        <small class="text-muted">Fill in the details below</small>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <form asp-action="Start" method="post">
+                    @Html.AntiForgeryToken()
+
+                    <!-- Class Selection -->
+                    <div class="mb-4">
+                        <label for="classId" class="form-label fw-semibold">
+                            <i class="bi bi-mortarboard me-1 text-primary"></i>Target Class Cohort
+                        </label>
+                        @{
+                            var classesList = ViewBag.Classes as List<SmartAttendanceSystem.Properties.Model.SchoolClass>;
+                            var selectedClassId = (int?)ViewBag.ClassId;
+                        }
+                        @if (classesList != null && classesList.Any())
+                        {
+                            <select name="classId" id="classId" class="form-select form-select-lg" required>
+                                @foreach (var c in classesList)
+                                {
+                                    <option value="@c.Id" selected="@(c.Id == selectedClassId)">
+                                        @c.Name @(c.Faculty != null ? $"— {c.Faculty.Name}" : "")
+                                    </option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            <input type="number" name="classId" id="classId" class="form-control"
+                                   value="@ViewBag.ClassId" placeholder="Enter class ID" required />
+                        }
+                        <div class="form-text">Choose the academic cohort for this session.</div>
+                    </div>
+
+                    <!-- Subject -->
+                    <div class="mb-4">
+                        <label for="subject" class="form-label fw-semibold">
+                            <i class="bi bi-book me-1 text-primary"></i>Subject / Course Title
+                        </label>
+                        <input type="text" name="subject" id="subject" class="form-control form-control-lg"
+                               placeholder="e.g. Advanced Software Engineering, Mathematics III" required />
+                        <div class="d-flex gap-1 flex-wrap mt-2">
+                            <small class="text-muted me-1">Quick Suggestions:</small>
+                            <button type="button" class="badge bg-light text-dark border quick-tag" onclick="setSubject('Software Engineering')">Software Engineering</button>
+                            <button type="button" class="badge bg-light text-dark border quick-tag" onclick="setSubject('Web Development')">Web Development</button>
+                            <button type="button" class="badge bg-light text-dark border quick-tag" onclick="setSubject('Artificial Intelligence')">Artificial Intelligence</button>
+                            <button type="button" class="badge bg-light text-dark border quick-tag" onclick="setSubject('Database Systems')">Database Systems</button>
+                            <button type="button" class="badge bg-light text-dark border quick-tag" onclick="setSubject('Cybersecurity')">Cybersecurity</button>
+                        </div>
+                    </div>
+
+                    <!-- Method -->
+                    @{
+                        var isFaceSelected = (string)ViewBag.SelectedMethod == "Face";
+                    }
+                    <div class="mb-4">
+                        <label class="form-label fw-medium">
+                            <i class="bi bi-shield-check me-1 text-primary"></i>Attendance Method
+                        </label>
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-6">
+                                <label class="method-card w-100" for="methodQR">
+                                    <input class="form-check-input d-none" type="radio"
+                                           name="method" id="methodQR" value="QR" @(!isFaceSelected ? "checked" : "") />
+                                    <div class="card border method-option p-3 h-100 shadow-sm" style="cursor:pointer; border-radius:14px; transition: all .25s ease;">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="badge bg-info text-dark fs-6"><i class="bi bi-qr-code"></i></span>
+                                            <strong class="fs-6">Dynamic QR Code</strong>
+                                        </div>
+                                        <p class="text-muted small mb-0">
+                                            Displays high-res time-synced QR token. Students scan with mobile camera to check in.
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="method-card w-100" for="methodFace">
+                                    <input class="form-check-input d-none" type="radio"
+                                           name="method" id="methodFace" value="Face" @(isFaceSelected ? "checked" : "") />
+                                    <div class="card border method-option p-3 h-100 shadow-sm" style="cursor:pointer; border-radius:14px; transition: all .25s ease;">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="badge bg-primary text-white fs-6"><i class="bi bi-person-bounding-box"></i></span>
+                                            <strong class="fs-6">Face AI Recognition</strong>
+                                        </div>
+                                        <p class="text-muted small mb-0">
+                                            Live classroom AI camera detection. Instant matching against biometric facial profiles.
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-3 shadow-sm fs-6">
+                        <i class="bi bi-play-circle-fill me-2"></i>Launch Attendance Session
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function setSubject(name) {
+            const input = document.getElementById('subject');
+            input.value = name;
+            input.focus();
+        }
+
+        // Highlight selected method card
+        document.querySelectorAll('input[name="method"]').forEach(radio => {
+            const card = radio.nextElementSibling;
+            if (radio.checked) {
+                card.classList.add('border-primary', 'shadow-md', 'bg-light');
+                card.style.borderColor = 'var(--primary)';
+                card.style.borderWidth = '2px';
+            }
+            radio.addEventListener('change', () => {
+                document.querySelectorAll('.method-option').forEach(c => {
+                    c.classList.remove('border-primary', 'shadow-md', 'bg-light');
+                    c.style.borderColor = '';
+                    c.style.borderWidth = '1px';
+                });
+                if (radio.checked) {
+                    card.classList.add('border-primary', 'shadow-md', 'bg-light');
+                    card.style.borderColor = 'var(--primary)';
+                    card.style.borderWidth = '2px';
+                }
+            });
+        });
+        // Init on load
+        document.querySelectorAll('input[name="method"]:checked').forEach(r => {
+            const card = r.nextElementSibling;
+            card.classList.add('border-primary', 'shadow-md', 'bg-light');
+            card.style.borderColor = 'var(--primary)';
+            card.style.borderWidth = '2px';
+        });
+    </script>
+}

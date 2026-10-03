@@ -1,0 +1,197 @@
+@{
+    ViewData["Title"] = "Scan QR Check-in";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-0">Scan Classroom QR</h2>
+                <p class="text-muted small mb-0">Scan the projected teacher QR code or enter session code</p>
+            </div>
+            <a asp-action="Dashboard" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Dashboard
+            </a>
+        </div>
+
+        <div class="card border-0 shadow-sm overflow-hidden mb-4">
+            <!-- Camera Viewport with HUD -->
+            <div class="camera-hud-container" style="min-height: 380px;">
+                <video id="qr-video" playsinline style="max-width: 100%; max-height: 380px; object-fit: cover; display: none;"></video>
+                
+                <div class="camera-hud-overlay" id="hudOverlay" style="display: none;">
+                    <div class="hud-corner hud-corner-tl"></div>
+                    <div class="hud-corner hud-corner-tr"></div>
+                    <div class="hud-corner hud-corner-bl"></div>
+                    <div class="hud-corner hud-corner-br"></div>
+                    <div class="laser-scanner-line"></div>
+                </div>
+
+                <div id="noCameraPrompt" class="text-center text-white p-4">
+                    <div class="stat-icon bg-white bg-opacity-10 text-white mx-auto mb-3" style="width: 72px; height: 72px; font-size: 2rem; border-radius: 50%;">
+                        <i class="bi bi-qr-code-scan"></i>
+                    </div>
+                    <h5 class="fw-bold text-white mb-2">Camera Scanner Ready</h5>
+                    <p class="text-white-50 small mb-3" style="max-width: 320px;">
+                        Point your camera at the teacher's projected QR code on the lecture screen.
+                    </p>
+                    <button id="startCamera" class="btn btn-primary px-4">
+                        <i class="bi bi-camera-video"></i> Start Scanner
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-3 bg-light border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div id="scanStatus" class="small text-muted">
+                    <i class="bi bi-shield-check text-success"></i> Secure 15-Minute Session Token Validation
+                </div>
+                <button id="stopCamera" class="btn btn-outline-danger btn-sm" disabled>
+                    <i class="bi bi-stop-circle"></i> Stop Camera
+                </button>
+            </div>
+        </div>
+
+        <!-- Manual Token / URL Fallback -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h6 class="fw-bold text-dark mb-1">Manual Session Code Fallback</h6>
+                <p class="text-muted small mb-3">If camera is unavailable, paste the check-in URL or session token directly</p>
+
+                <div class="input-group mb-2">
+                    <span class="input-group-text bg-light text-muted">
+                        <i class="bi bi-key"></i>
+                    </span>
+                    <input id="tokenInput" class="form-control" placeholder="Paste session token or URL..." />
+                    <button id="checkBtn" class="btn btn-primary px-4">
+                        <i class="bi bi-check2"></i> Submit Check-in
+                    </button>
+                </div>
+
+                <div id="result" class="mt-3" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import QrScanner from 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner.min.js';
+    QrScanner.WORKER_PATH = 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner-worker.min.js';
+
+    const video = document.getElementById('qr-video');
+    const startBtn = document.getElementById('startCamera');
+    const stopBtn = document.getElementById('stopCamera');
+    const noCameraPrompt = document.getElementById('noCameraPrompt');
+    const hudOverlay = document.getElementById('hudOverlay');
+    const tokenInput = document.getElementById('tokenInput');
+    const checkBtn = document.getElementById('checkBtn');
+    const resultDiv = document.getElementById('result');
+    const scanStatus = document.getElementById('scanStatus');
+
+    let scanner = null;
+
+    function playSuccessBeep() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 880;
+            gain.gain.value = 0.1;
+            osc.start();
+            setTimeout(() => { osc.stop(); }, 180);
+        } catch (e) { }
+    }
+
+    function showResult(text, success = true) {
+        resultDiv.style.display = 'block';
+        resultDiv.innerText = text;
+        resultDiv.className = success 
+            ? 'alert alert-success rounded-3 border-0 shadow-sm d-flex align-items-center gap-2 mt-3' 
+            : 'alert alert-danger rounded-3 border-0 shadow-sm d-flex align-items-center gap-2 mt-3';
+        
+        if (success) {
+            playSuccessBeep();
+            setTimeout(() => {
+                window.location.href = '/Student/Dashboard';
+            }, 2500);
+        }
+    }
+
+    async function doCheck(tokenOrUrl) {
+        let token = tokenOrUrl.trim();
+        try {
+            const url = new URL(tokenOrUrl);
+            token = url.searchParams.get('token') || url.pathname.split('/').pop();
+        } catch (e) { }
+
+        if (!token) { 
+            showResult('No token found in input. Please paste a valid session token.', false); 
+            return; 
+        }
+
+        scanStatus.innerHTML = '<span class="spinner-border spinner-border-sm text-primary"></span> Validating attendance token...';
+
+        const checkUrl = `/Attendance/Check?token=${encodeURIComponent(token)}`;
+        try {
+            const res = await fetch(checkUrl, { credentials: 'same-origin' });
+            const text = await res.text();
+            showResult(text, res.ok);
+            scanStatus.innerHTML = res.ok 
+                ? '<i class="bi bi-check-circle text-success"></i> Attendance Recorded!' 
+                : '<i class="bi bi-x-circle text-danger"></i> Check-in Failed';
+        } catch (err) {
+            showResult('Network error contacting server: ' + err.message, false);
+            scanStatus.innerHTML = '<i class="bi bi-exclamation-triangle text-danger"></i> Error';
+        }
+    }
+
+    startBtn.addEventListener('click', async () => {
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        video.style.display = 'block';
+        noCameraPrompt.style.display = 'none';
+        hudOverlay.style.display = 'block';
+
+        scanner = new QrScanner(video, result => {
+            doCheck(result);
+            scanner.stop();
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            video.style.display = 'none';
+            hudOverlay.style.display = 'none';
+            noCameraPrompt.style.display = 'block';
+        });
+
+        try {
+            await scanner.start();
+            scanStatus.innerHTML = '<span class="pulse-indicator me-1"></span> Camera active. Scanning for QR code...';
+        } catch (e) {
+            showResult('Camera start failed: ' + e.message, false);
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            video.style.display = 'none';
+            hudOverlay.style.display = 'none';
+            noCameraPrompt.style.display = 'block';
+        }
+    });
+
+    stopBtn.addEventListener('click', () => {
+        if (scanner) {
+            scanner.stop();
+            scanner.destroy();
+            scanner = null;
+        }
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        video.style.display = 'none';
+        hudOverlay.style.display = 'none';
+        noCameraPrompt.style.display = 'block';
+        scanStatus.innerHTML = '<i class="bi bi-shield-check text-success"></i> Secure 15-Minute Session Token Validation';
+    });
+
+    checkBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        doCheck(tokenInput.value);
+    });
+</script>

@@ -1,0 +1,28 @@
+@{
+    ViewData["Title"] = "Face Enrollment Required";
+    var studentId = ViewBag.StudentId;
+}
+
+<div class="row justify-content-center py-5">
+    <div class="col-md-7 col-lg-5 text-center">
+        <div class="card border-0 shadow-lg p-4 p-md-5" style="border-radius: var(--radius-xl);">
+            <div class="stat-icon bg-warning-subtle text-warning mx-auto mb-4" style="width: 80px; height: 80px; font-size: 2.5rem; border-radius: 50%;">
+                <i class="bi bi-person-bounding-box"></i>
+            </div>
+            
+            <h3 class="fw-bold mb-2">Face Biometrics Required</h3>
+            <p class="text-muted mb-4">
+                @(ViewBag.Message ?? "You need to enroll your face first to use contact-free AI attendance check-in.")
+            </p>
+            
+            <div class="d-grid gap-2">
+                <a asp-action="FaceEnrollment" asp-route-id="@studentId" class="btn btn-primary py-2 fs-6">
+                    <i class="bi bi-camera"></i> Enroll My Face Now
+                </a>
+                <a asp-action="Dashboard" class="btn btn-outline-secondary py-2">
+                    <i class="bi bi-arrow-left"></i> Return to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

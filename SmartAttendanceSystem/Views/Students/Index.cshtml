@@ -1,0 +1,37 @@
+@model IEnumerable<SmartAttendanceSystem.Properties.Model.Student>
+
+@{
+    ViewData["Title"] = "Students";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>👨‍🎓 Students</h3>
+    <a asp-action="Create" class="btn btn-primary">Add Student</a>
+</div>
+
+@if (TempData["Message"] != null)
+{
+    <div class="alert alert-success">@TempData["Message"]</div>
+}
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Enrollment</th>
+            <th>Name</th>
+            <th>Faculty</th>
+            <th>Class</th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var s in Model)
+    {
+        <tr>
+            <td>@s.EnrollmentNumber</td>
+            <td>@s.Name</td>
+            <td>@s.Faculty?.Name</td>
+            <td>@s.SchoolClass?.Name</td>
+        </tr>
+    }
+    </tbody>
+</table>

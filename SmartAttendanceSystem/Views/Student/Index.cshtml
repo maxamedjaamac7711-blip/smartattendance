@@ -1,0 +1,139 @@
+@model IEnumerable<SmartAttendanceSystem.Properties.Model.Student>
+
+@{
+    ViewData["Title"] = "Students Directory";
+    var studentList = Model.ToList();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <div class="d-flex align-items-center gap-2">
+            <h2 class="fw-bold mb-0">Students Directory</h2>
+            <span class="badge badge-soft-primary badge-pill">@studentList.Count Students</span>
+        </div>
+        <p class="text-muted small mb-0 mt-1">Manage student profiles, biometrics enrollments, and academic cohorts</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-person-plus-fill"></i> Add New Student
+        </a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header card-header-clean d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0 fw-bold">All Enrolled Students</h5>
+        <div class="d-flex align-items-center gap-2">
+            <input type="text" id="studentFilter" class="form-control form-control-sm" placeholder="Search by name, ID, or class..." style="width: 260px;" />
+        </div>
+    </div>
+    <div class="card-body p-0">
+        @if (studentList.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-modern" id="studentsTable">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Student ID</th>
+                            <th>Faculty / Department</th>
+                            <th>Class Cohort</th>
+                            <th>Biometrics</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in studentList)
+                        {
+                            var initial = s.Name.Length > 0 ? s.Name.Substring(0, 1).ToUpper() : "S";
+                            var hasFace = !string.IsNullOrEmpty(s.FaceEmbedding);
+
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        @if (!string.IsNullOrEmpty(s.FaceImagePath))
+                                        {
+                                            <img src="@s.FaceImagePath" alt="@s.Name" class="rounded-circle border" style="width: 38px; height: 38px; object-fit: cover;" />
+                                        }
+                                        else
+                                        {
+                                            <div class="user-avatar-bubble" style="width: 38px; height: 38px; font-size: 0.85rem;">
+                                                @initial
+                                            </div>
+                                        }
+                                        <div>
+                                            <div class="fw-semibold text-dark">@s.Name</div>
+                                            <small class="text-muted">Username: @(s.User?.UserName ?? s.EnrollmentNumber)</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="font-monospace fw-semibold text-dark">@s.EnrollmentNumber</span>
+                                </td>
+                                <td>
+                                    <span class="fw-medium text-dark">@(s.Faculty?.Name ?? "—")</span>
+                                </td>
+                                <td>
+                                    <span class="badge badge-soft-dark badge-pill">@(s.SchoolClass?.Name ?? "—")</span>
+                                </td>
+                                <td>
+                                    @if (hasFace)
+                                    {
+                                        <span class="badge badge-soft-success badge-pill">
+                                            <i class="bi bi-shield-check"></i> Enrolled
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <a asp-action="FaceEnrollment" asp-route-id="@s.StudentID" class="badge badge-soft-warning badge-pill text-decoration-none">
+                                            <i class="bi bi-camera"></i> Enroll Face
+                                        </a>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-flex justify-content-end gap-1">
+                                        <a asp-action="FaceEnrollment" asp-route-id="@s.StudentID" class="btn btn-sm btn-outline-info" title="Face Biometrics">
+                                            <i class="bi bi-camera"></i>
+                                        </a>
+                                        <a asp-action="Edit" asp-route-id="@s.StudentID" class="btn btn-sm btn-outline-primary" title="Edit Profile">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <form asp-action="Delete" asp-route-id="@s.StudentID" method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to delete student @s.Name and all their attendance records?');">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-mortarboard fs-1 d-block mb-2"></i>
+                <h6>No students registered in the database yet.</h6>
+                <a asp-action="Create" class="btn btn-primary btn-sm mt-2">
+                    <i class="bi bi-person-plus-fill"></i> Add First Student
+                </a>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('studentFilter')?.addEventListener('keyup', function () {
+            const query = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#studentsTable tbody tr');
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
+            });
+        });
+    </script>
+}

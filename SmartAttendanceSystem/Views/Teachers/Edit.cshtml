@@ -1,0 +1,85 @@
+@model SmartAttendanceSystem.Models.TeacherEditViewModel
+
+@{
+    ViewData["Title"] = "Edit Instructor";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-0">Edit Instructor Profile</h2>
+                <p class="text-muted small mb-0">Update academic assignment or credentials for @Model.Name</p>
+            </div>
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Back to Directory
+            </a>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 p-md-5">
+                <form asp-action="Edit" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="Id" />
+
+                    <div asp-validation-summary="All" class="alert alert-danger rounded-3 small py-2 mb-4" style="display: @(ViewData.ModelState.IsValid ? "none" : "block")"></div>
+
+                    <h6 class="fw-bold text-uppercase text-primary small mb-3" style="letter-spacing: 0.05em;">Instructor Information</h6>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label asp-for="Name" class="form-label">Full Name</label>
+                            <input asp-for="Name" class="form-control" required />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="Email" class="form-label">Email Address</label>
+                            <input asp-for="Email" type="email" class="form-control" required />
+                            <span asp-validation-for="Email" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="FacultyId" class="form-label">Faculty Department</label>
+                            <select asp-for="FacultyId" class="form-select" asp-items="ViewBag.Faculties" required></select>
+                            <span asp-validation-for="FacultyId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="ClassId" class="form-label">Assigned Class Cohort</label>
+                            <select asp-for="ClassId" class="form-select" asp-items="ViewBag.Classes" required></select>
+                            <span asp-validation-for="ClassId" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-uppercase text-primary small mb-3 border-top pt-3" style="letter-spacing: 0.05em;">Security & Login</h6>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">Username</label>
+                            <input class="form-control bg-light" value="@Model.Username" readonly />
+                            <small class="text-muted">Username is fixed</small>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="NewPassword" class="form-label">Reset Password (Optional)</label>
+                            <input asp-for="NewPassword" type="password" class="form-control" placeholder="Leave blank to keep current" />
+                            <span asp-validation-for="NewPassword" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-check2"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

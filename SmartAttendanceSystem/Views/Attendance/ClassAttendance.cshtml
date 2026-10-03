@@ -1,0 +1,156 @@
+@model IEnumerable<SmartAttendanceSystem.Models.StudentAttendanceViewModel>
+
+@{
+    ViewData["Title"] = "Class Attendance";
+    var presentList = Model.Where(s => s.Present).ToList();
+    var absentList  = Model.Where(s => !s.Present).ToList();
+    var total       = Model.Count();
+    var presentPct  = total > 0 ? (double)presentList.Count / total * 100 : 0;
+}
+
+<div class="page-header mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <a asp-action="Index" class="btn btn-ghost btn-sm">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div>
+            <h1 class="page-title mb-0">Attendance — @ViewBag.ClassName</h1>
+            <p class="text-muted mb-0 small">Real-time roll call for this class</p>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Row -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-4">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:var(--primary-gradient);">
+                <i class="bi bi-people"></i>
+            </div>
+            <div class="stat-value">@total</div>
+            <div class="stat-label">Total Students</div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:linear-gradient(135deg,#22c55e,#16a34a);">
+                <i class="bi bi-check-circle"></i>
+            </div>
+            <div class="stat-value text-success">@presentList.Count</div>
+            <div class="stat-label">Present</div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:linear-gradient(135deg,#ef4444,#dc2626);">
+                <i class="bi bi-x-circle"></i>
+            </div>
+            <div class="stat-value text-danger">@absentList.Count</div>
+            <div class="stat-label">Absent</div>
+        </div>
+    </div>
+</div>
+
+<!-- Attendance Progress -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3 px-4">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="fw-medium">Attendance Rate</span>
+            <span class="fw-bold @(presentPct >= 75 ? "text-success" : "text-danger")">
+                @presentPct.ToString("F1")%
+            </span>
+        </div>
+        <div class="progress" style="height:10px; border-radius:999px;">
+            <div class="progress-bar @(presentPct >= 75 ? "bg-success" : "bg-danger")"
+                 role="progressbar"
+                 style="width: @presentPct.ToString("F1")%; border-radius:999px;"
+                 aria-valuenow="@presentPct" aria-valuemin="0" aria-valuemax="100">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Roll Call Table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0 d-flex align-items-center justify-content-between">
+        <h5 class="fw-semibold mb-0">
+            <i class="bi bi-list-check me-2 text-primary"></i>Roll Call
+        </h5>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-ghost" id="showAll">All</button>
+            <button class="btn btn-sm btn-ghost" id="showPresent">Present</button>
+            <button class="btn btn-sm btn-ghost" id="showAbsent">Absent</button>
+        </div>
+    </div>
+    <div class="card-body p-0 pt-3">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="rollTable">
+                <thead>
+                    <tr>
+                        <th class="ps-4">#</th>
+                        <th>Enrollment</th>
+                        <th>Student Name</th>
+                        <th class="pe-4">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{int i = 1;}
+                    @foreach (var s in Model.OrderBy(x => x.Name))
+                    {
+                        <tr class="attendance-row @(s.Present ? "present" : "absent")">
+                            <td class="ps-4 text-muted">@i</td>
+                            <td>
+                                <code class="small">@s.EnrollmentNumber</code>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="user-avatar user-avatar-sm @(s.Present ? "bg-success" : "bg-danger")"
+                                         style="font-size:.7rem; min-width:32px; height:32px; border-radius:50%; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700;">
+                                        @s.Name[0]
+                                    </div>
+                                    <span class="fw-medium">@s.Name</span>
+                                </div>
+                            </td>
+                            <td class="pe-4">
+                                @if (s.Present)
+                                {
+                                    <span class="badge bg-success-subtle text-success px-3 py-2">
+                                        <i class="bi bi-check-circle-fill me-1"></i>Present
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger-subtle text-danger px-3 py-2">
+                                        <i class="bi bi-x-circle-fill me-1"></i>Absent
+                                    </span>
+                                }
+                            </td>
+                        </tr>
+                        i++;
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const rows = document.querySelectorAll('.attendance-row');
+
+        function filter(type) {
+            rows.forEach(r => {
+                if (type === 'all') r.style.display = '';
+                else if (type === 'present') r.style.display = r.classList.contains('present') ? '' : 'none';
+                else r.style.display = r.classList.contains('absent') ? '' : 'none';
+            });
+            document.querySelectorAll('#showAll, #showPresent, #showAbsent').forEach(b => b.classList.remove('active'));
+            document.getElementById('show' + type.charAt(0).toUpperCase() + type.slice(1)).classList.add('active');
+        }
+
+        document.getElementById('showAll').addEventListener('click', () => filter('all'));
+        document.getElementById('showPresent').addEventListener('click', () => filter('present'));
+        document.getElementById('showAbsent').addEventListener('click', () => filter('absent'));
+        document.getElementById('showAll').classList.add('active');
+    </script>
+}

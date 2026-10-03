@@ -1,0 +1,182 @@
+@model SmartAttendanceSystem.Properties.Model.Student
+
+@{
+    ViewData["Title"] = "Digital Student ID";
+    var initial = Model.Name.Length > 0 ? Model.Name.Substring(0, 1).ToUpper() : "S";
+    var hasFace = !string.IsNullOrEmpty(Model.FaceEmbedding);
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <h2 class="fw-bold mb-0">Digital Student ID & Profile</h2>
+        <p class="text-muted small mb-0">Official institutional identification & biometrics credentials</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Dashboard" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Dashboard
+        </a>
+        <button class="btn btn-primary btn-sm" onclick="window.print()">
+            <i class="bi bi-printer"></i> Print ID Card
+        </button>
+    </div>
+</div>
+
+<div class="row g-4 justify-content-center">
+    <!-- Digital ID Card (Sleek Credential View) -->
+    <div class="col-lg-5 col-md-8">
+        <div class="student-id-card shadow-xl">
+            <!-- Card Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-3 bg-white bg-opacity-20 p-2 text-white">
+                        <i class="bi bi-person-bounding-box fs-5"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-white small text-uppercase tracking-wider">SmartAttendance Pro</div>
+                        <div class="text-white-50" style="font-size: 0.7rem;">INSTITUTIONAL ID CARD</div>
+                    </div>
+                </div>
+                <span class="badge bg-white bg-opacity-20 text-white rounded-pill px-3 py-1 small">
+                    STUDENT
+                </span>
+            </div>
+
+            <!-- Card Body: Avatar & Info -->
+            <div class="d-flex align-items-center gap-3 mb-4">
+                @if (!string.IsNullOrEmpty(Model.FaceImagePath))
+                {
+                    <img src="@Model.FaceImagePath" alt="@Model.Name" class="rounded-4 border border-2 border-white border-opacity-50 shadow-sm" style="width: 88px; height: 88px; object-fit: cover;" />
+                }
+                else
+                {
+                    <div class="user-avatar-bubble avatar-lg rounded-4 border border-2 border-white border-opacity-50 shadow-sm">
+                        @initial
+                    </div>
+                }
+                <div>
+                    <h4 class="fw-bold text-white mb-1">@Model.Name</h4>
+                    <div class="text-info fw-semibold font-monospace small mb-1">
+                        ID: @Model.EnrollmentNumber
+                    </div>
+                    <span class="badge bg-success bg-opacity-30 text-success-emphasis border border-success border-opacity-25 rounded-pill small py-1 px-2">
+                        <i class="bi bi-patch-check-fill me-1"></i> Active Status
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card Details Grid -->
+            <div class="p-3 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 mb-4">
+                <div class="row g-2 text-white small">
+                    <div class="col-6">
+                        <div class="text-white-50 text-uppercase" style="font-size: 0.68rem;">Faculty / Major</div>
+                        <div class="fw-semibold">@(Model.Faculty?.Name ?? "Not Assigned")</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-white-50 text-uppercase" style="font-size: 0.68rem;">Class Cohort</div>
+                        <div class="fw-semibold">@(Model.SchoolClass?.Name ?? "General Cohort")</div>
+                    </div>
+                    <div class="col-6 mt-2">
+                        <div class="text-white-50 text-uppercase" style="font-size: 0.68rem;">Issue Validity</div>
+                        <div class="fw-semibold">@DateTime.UtcNow.Year - @(DateTime.UtcNow.Year + 1) Academic</div>
+                    </div>
+                    <div class="col-6 mt-2">
+                        <div class="text-white-50 text-uppercase" style="font-size: 0.68rem;">Biometric Status</div>
+                        <div class="fw-semibold text-@(hasFace ? "success" : "warning")">
+                            @(hasFace ? "Enrolled & Ready" : "Pending Enrollment")
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card Barcode Mockup -->
+            <div class="pt-2 text-center border-top border-white border-opacity-15">
+                <div class="text-white-50 small mb-1" style="font-size: 0.7rem; letter-spacing: 0.1em;">
+                    ||| | ||||| || |||||| | ||| |||| | |||||||| ||||
+                </div>
+                <small class="text-white-50 font-monospace" style="font-size: 0.72rem;">@Model.EnrollmentNumber</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Details & Biometrics Management -->
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header card-header-clean">
+                <h5 class="mb-0 fw-bold">Student Profile Details</h5>
+                <small class="text-muted">Registered administrative information</small>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Full Legal Name</label>
+                        <div class="p-2 rounded-3 bg-light border fw-semibold">@Model.Name</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Enrollment / Student ID</label>
+                        <div class="p-2 rounded-3 bg-light border font-monospace fw-semibold">@Model.EnrollmentNumber</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Faculty Department</label>
+                        <div class="p-2 rounded-3 bg-light border fw-medium">@(Model.Faculty?.Name ?? "N/A")</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Enrolled Class Cohort</label>
+                        <div class="p-2 rounded-3 bg-light border fw-medium">@(Model.SchoolClass?.Name ?? "N/A")</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Portal Username</label>
+                        <div class="p-2 rounded-3 bg-light border fw-medium">@(Model.User?.UserName ?? "student")</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Registered Email</label>
+                        <div class="p-2 rounded-3 bg-light border fw-medium">@(Model.User?.Email ?? $"{Model.EnrollmentNumber}@student.edu")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Biometric Face Enrollment Status Card -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header card-header-clean d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0 fw-bold">Facial Biometrics Status</h5>
+                    <small class="text-muted">Neural embedding for contact-free attendance</small>
+                </div>
+                @if (hasFace)
+                {
+                    <span class="badge badge-soft-success badge-pill">
+                        <i class="bi bi-shield-check"></i> Enrolled
+                    </span>
+                }
+                else
+                {
+                    <span class="badge badge-soft-warning badge-pill">
+                        <i class="bi bi-exclamation-triangle"></i> Not Enrolled
+                    </span>
+                }
+            </div>
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon @(hasFace ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning")" style="width: 52px; height: 52px;">
+                            <i class="bi @(hasFace ? "bi-person-check-fill" : "bi-camera") fs-3"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-1">
+                                @(hasFace ? "128-Dimension Face Descriptor Active" : "No Biometric Data Found")
+                            </h6>
+                            <p class="text-muted small mb-0">
+                                @(hasFace 
+                                    ? "Your facial biometrics are verified and ready for real-time classroom check-ins." 
+                                    : "You must enroll your face to participate in facial recognition attendance sessions.")
+                            </p>
+                        </div>
+                    </div>
+                    <a asp-action="FaceEnrollment" asp-route-id="@Model.StudentID" class="btn btn-primary btn-sm">
+                        <i class="bi bi-camera"></i> @(hasFace ? "Update Face Data" : "Enroll Face Now")
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

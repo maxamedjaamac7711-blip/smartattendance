@@ -1,0 +1,27 @@
+@{
+    ViewData["Title"] = "Instructor Profile Required";
+}
+
+<div class="row justify-content-center py-5">
+    <div class="col-md-7 col-lg-5 text-center">
+        <div class="card border-0 shadow-lg p-4 p-md-5" style="border-radius: var(--radius-xl);">
+            <div class="stat-icon bg-info-subtle text-info mx-auto mb-4" style="width: 80px; height: 80px; font-size: 2.5rem; border-radius: 50%;">
+                <i class="bi bi-person-video3"></i>
+            </div>
+            
+            <h3 class="fw-bold mb-2">Teacher Profile Not Linked</h3>
+            <p class="text-muted mb-4">
+                Your user login is authenticated, but no active instructor profile was found associated with your credentials. Please ask your system administrator to register you in the Teachers Directory.
+            </p>
+            
+            <div class="d-grid gap-2">
+                <form asp-controller="Account" asp-action="Logout" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-danger w-100 py-2">
+                        <i class="bi bi-box-arrow-right"></i> Log Out
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

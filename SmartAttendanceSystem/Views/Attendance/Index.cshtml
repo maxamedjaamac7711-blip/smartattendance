@@ -1,0 +1,264 @@
+@model IEnumerable<SmartAttendanceSystem.Properties.Model.AttendanceSession>
+
+@{
+    ViewData["Title"] = "Attendance Sessions";
+    var sessionsList = Model.OrderByDescending(x => x.CreatedAt).ToList();
+    var activeCount = sessionsList.Count(s => s.ExpiresAt > DateTime.UtcNow && s.IsActive);
+    var faceCount = sessionsList.Count(s => s.Method == "Face");
+    var qrCount = sessionsList.Count(s => s.Method != "Face");
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <div class="d-flex align-items-center gap-2">
+            <h2 class="fw-bold mb-0">Attendance Sessions</h2>
+            <span class="badge badge-soft-primary badge-pill">@sessionsList.Count Total Sessions</span>
+            @if (activeCount > 0)
+            {
+                <span class="badge badge-soft-danger badge-pill">
+                    <span class="pulse-indicator me-1"></span> @activeCount Live Now
+                </span>
+            }
+        </div>
+        <p class="text-muted small mb-0 mt-1">Monitor, launch, and inspect classroom attendance tokens</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Start" asp-route-method="QR" class="btn btn-outline-primary">
+            <i class="bi bi-qr-code"></i> Launch QR
+        </a>
+        <a asp-action="Start" asp-route-method="Face" class="btn btn-primary">
+            <i class="bi bi-play-circle-fill"></i> Launch Face AI
+        </a>
+    </div>
+</div>
+
+<!-- Stat Metric Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <div class="stat-label">Total Sessions</div>
+                    <div class="stat-number">@sessionsList.Count</div>
+                </div>
+                <div class="stat-icon bg-primary-subtle text-primary">
+                    <i class="bi bi-clock-history"></i>
+                </div>
+            </div>
+            <div class="pt-2 border-top border-light">
+                <small class="text-muted">Recorded session history</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <div class="stat-label">Active Sessions</div>
+                    <div class="stat-number @(activeCount > 0 ? "text-danger" : "text-dark")">@activeCount</div>
+                </div>
+                <div class="stat-icon @(activeCount > 0 ? "bg-danger-subtle text-danger" : "bg-light text-muted")">
+                    <i class="bi bi-broadcast"></i>
+                </div>
+            </div>
+            <div class="pt-2 border-top border-light">
+                @if (activeCount > 0)
+                {
+                    <span class="badge badge-soft-danger badge-pill">
+                        <span class="pulse-indicator me-1"></span> Accepting Check-ins
+                    </span>
+                }
+                else
+                {
+                    <span class="text-muted small">No sessions currently active</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <div class="stat-label">Face AI Sessions</div>
+                    <div class="stat-number text-primary">@faceCount</div>
+                </div>
+                <div class="stat-icon bg-info-subtle text-info">
+                    <i class="bi bi-person-bounding-box"></i>
+                </div>
+            </div>
+            <div class="pt-2 border-top border-light">
+                <small class="text-muted">Biometric camera check-ins</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <div class="stat-label">QR Code Sessions</div>
+                    <div class="stat-number text-success">@qrCount</div>
+                </div>
+                <div class="stat-icon bg-success-subtle text-success">
+                    <i class="bi bi-qr-code-scan"></i>
+                </div>
+            </div>
+            <div class="pt-2 border-top border-light">
+                <small class="text-muted">Cryptographic QR tokens</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sessions Table Card -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header card-header-clean d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <h5 class="mb-0 fw-bold">All Attendance Sessions</h5>
+            <small class="text-muted">Real-time status and quick classroom controls</small>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <input type="text" id="sessionSearch" class="form-control form-control-sm" placeholder="Search class, subject, token..." style="width: 240px;" />
+            <select id="methodFilter" class="form-select form-select-sm" style="width: 140px;">
+                <option value="">All Methods</option>
+                <option value="QR">QR Code</option>
+                <option value="Face">Face AI</option>
+            </select>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        @if (!sessionsList.Any())
+        {
+            <div class="text-center py-5 px-4">
+                <div class="stat-icon bg-light text-muted mx-auto mb-3" style="width: 64px; height: 64px; font-size: 1.8rem; border-radius: 50%;">
+                    <i class="bi bi-clock-history"></i>
+                </div>
+                <h5 class="fw-bold text-dark">No Attendance Sessions Yet</h5>
+                <p class="text-muted small mb-3">Launch your first session to allow students to mark attendance.</p>
+                <a asp-action="Start" class="btn btn-primary btn-sm">
+                    <i class="bi bi-play-circle-fill me-1"></i> Start New Session
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-modern" id="sessionsTable">
+                    <thead>
+                        <tr>
+                            <th>Class & Subject</th>
+                            <th>Method</th>
+                            <th>Token ID</th>
+                            <th>Started Time</th>
+                            <th>Expires At</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in sessionsList)
+                        {
+                            var isActive = s.ExpiresAt > DateTime.UtcNow && s.IsActive;
+                            var isFace = s.Method == "Face";
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="stat-icon @(isFace ? "bg-primary-subtle text-primary" : "bg-info-subtle text-info")" style="width: 36px; height: 36px; font-size: 1rem;">
+                                            <i class="bi @(isFace ? "bi-person-bounding-box" : "bi-qr-code")"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark">@(s.Class?.Name ?? "General Cohort")</div>
+                                            <small class="text-muted">@(s.Subject ?? "Class Lecture")</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (isFace)
+                                    {
+                                        <span class="badge badge-soft-primary badge-pill">
+                                            <i class="bi bi-camera-fill"></i> Face AI
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-soft-info badge-pill">
+                                            <i class="bi bi-qr-code"></i> QR Code
+                                        </span>
+                                    }
+                                </td>
+                                <td>
+                                    <code class="small text-muted bg-light px-2 py-1 rounded">@s.Token[..Math.Min(8, s.Token.Length)]…</code>
+                                </td>
+                                <td>
+                                    <div class="small fw-semibold text-dark">@s.CreatedAt.ToLocalTime().ToString("hh:mm tt")</div>
+                                    <small class="text-muted">@s.CreatedAt.ToLocalTime().ToString("MMM dd")</small>
+                                </td>
+                                <td>
+                                    <div class="small fw-semibold text-dark">@s.ExpiresAt.ToLocalTime().ToString("hh:mm tt")</div>
+                                    <small class="text-muted">@s.ExpiresAt.ToLocalTime().ToString("MMM dd")</small>
+                                </td>
+                                <td>
+                                    @if (isActive)
+                                    {
+                                        <span class="badge badge-soft-success badge-pill">
+                                            <span class="pulse-indicator me-1"></span> LIVE ACTIVE
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-soft-dark badge-pill">Expired</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-flex justify-content-end gap-1">
+                                        @if (isFace)
+                                        {
+                                            <a asp-action="FaceRecognition" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary" title="Launch Face Scanner">
+                                                <i class="bi bi-camera"></i> Scan
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            <a asp-action="QR" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary" title="Display QR Code">
+                                                <i class="bi bi-qr-code"></i> QR
+                                            </a>
+                                        }
+                                        <a asp-action="ClassAttendance" asp-route-classId="@s.ClassId" class="btn btn-sm btn-outline-secondary" title="View Class Attendance">
+                                            <i class="bi bi-people"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const searchInput = document.getElementById('sessionSearch');
+        const methodFilter = document.getElementById('methodFilter');
+        const table = document.getElementById('sessionsTable');
+
+        function filterRows() {
+            if (!table) return;
+            const q = (searchInput?.value || '').toLowerCase();
+            const method = (methodFilter?.value || '').toLowerCase();
+
+            table.querySelectorAll('tbody tr').forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const matchesText = !q || text.includes(q);
+                const matchesMethod = !method || text.includes(method);
+                row.style.display = matchesText && matchesMethod ? '' : 'none';
+            });
+        }
+
+        searchInput?.addEventListener('input', filterRows);
+        methodFilter?.addEventListener('change', filterRows);
+    </script>
+}

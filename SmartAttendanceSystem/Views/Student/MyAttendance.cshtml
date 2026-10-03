@@ -1,0 +1,194 @@
+@model SmartAttendanceSystem.Models.StudentAttendanceHistoryViewModel
+
+@{
+    ViewData["Title"] = "My Attendance History";
+    var absentCount = Math.Max(0, Model.TotalClassSessions - Model.TotalAttended);
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <div class="d-flex align-items-center gap-2">
+            <h2 class="fw-bold mb-0">My Attendance History</h2>
+            <span class="badge badge-soft-primary badge-pill">Academic Record</span>
+        </div>
+        <p class="text-muted small mb-0 mt-1">
+            Student: <strong>@Model.Student.Name</strong> (ID: @Model.Student.EnrollmentNumber) &bull; Class: @(Model.Student.SchoolClass?.Name ?? "Class Cohort")
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Dashboard" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Dashboard
+        </a>
+        <button class="btn btn-primary btn-sm" onclick="window.print()">
+            <i class="bi bi-printer"></i> Print Record
+        </button>
+    </div>
+</div>
+
+<!-- Performance Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <div class="stat-label">Attendance Rate</div>
+                    <div class="stat-number @(Model.AttendancePercentage >= 75 ? "text-success" : "text-danger")">
+                        @Model.AttendancePercentage%
+                    </div>
+                </div>
+                <div class="stat-icon bg-success-subtle text-success">
+                    <i class="bi bi-pie-chart-fill"></i>
+                </div>
+            </div>
+            <div class="progress mb-2" style="height: 6px;">
+                <div class="progress-bar @(Model.AttendancePercentage >= 75 ? "bg-success" : "bg-danger")" role="progressbar" style="width: @Model.AttendancePercentage%"></div>
+            </div>
+            <small class="text-muted">Target threshold: 75% required</small>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <div class="stat-label">Sessions Present</div>
+                    <div class="stat-number text-success">@Model.TotalAttended</div>
+                </div>
+                <div class="stat-icon bg-primary-subtle text-primary">
+                    <i class="bi bi-check-all"></i>
+                </div>
+            </div>
+            <small class="text-muted">Out of @Model.TotalClassSessions total class lectures</small>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <div class="stat-label">Face AI Check-ins</div>
+                    <div class="stat-number text-info">@Model.FaceCheckIns</div>
+                </div>
+                <div class="stat-icon bg-info-subtle text-info">
+                    <i class="bi bi-camera-fill"></i>
+                </div>
+            </div>
+            <small class="text-muted">Biometrically verified sessions</small>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <div class="stat-label">QR Code Check-ins</div>
+                    <div class="stat-number text-dark">@Model.QrCheckIns</div>
+                </div>
+                <div class="stat-icon bg-warning-subtle text-warning">
+                    <i class="bi bi-qr-code-scan"></i>
+                </div>
+            </div>
+            <small class="text-muted">@Model.ManualCheckIns manual verifications</small>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Attendance Records Table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header card-header-clean d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h5 class="mb-0 fw-bold">Verified Attendance Logs</h5>
+            <small class="text-muted">Complete breakdown of all registered check-ins</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <input type="text" id="tableFilter" class="form-control form-control-sm" placeholder="Search subject or date..." style="width: 220px;" />
+        </div>
+    </div>
+    <div class="card-body p-0">
+        @if (Model.Records.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-modern" id="attendanceTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Date & Time</th>
+                            <th>Subject / Course</th>
+                            <th>Class</th>
+                            <th>Verification Method</th>
+                            <th class="text-end">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ int index = 1; }
+                        @foreach (var rec in Model.Records)
+                        {
+                            var isFace = rec.Method == "Face";
+                            <tr>
+                                <td class="text-muted small">@index</td>
+                                <td>
+                                    <div class="fw-semibold text-dark">@rec.Date.ToLocalTime().ToString("MMM dd, yyyy")</div>
+                                    <small class="text-muted">@rec.Date.ToLocalTime().ToString("hh:mm:ss tt")</small>
+                                </td>
+                                <td>
+                                    <div class="fw-medium text-dark">@rec.Subject</div>
+                                </td>
+                                <td>
+                                    <span class="badge badge-soft-dark badge-pill">@rec.ClassName</span>
+                                </td>
+                                <td>
+                                    @if (isFace)
+                                    {
+                                        <span class="badge badge-soft-info badge-pill">
+                                            <i class="bi bi-camera-fill"></i> Face Recognition
+                                        </span>
+                                    }
+                                    else if (rec.Method == "Manual")
+                                    {
+                                        <span class="badge badge-soft-dark badge-pill">
+                                            <i class="bi bi-person-check"></i> Teacher Override
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-soft-primary badge-pill">
+                                            <i class="bi bi-qr-code"></i> QR Scan
+                                        </span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <span class="badge badge-soft-success badge-pill">
+                                        <i class="bi bi-check-circle-fill"></i> Present
+                                    </span>
+                                </td>
+                            </tr>
+                            index++;
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <div class="display-4 text-muted mb-3"><i class="bi bi-calendar-x"></i></div>
+                <h5 class="fw-bold">No Attendance Records Found</h5>
+                <p class="text-muted small mb-3">You have not marked attendance in any class session yet.</p>
+                <a asp-action="Dashboard" class="btn btn-primary btn-sm">Return to Dashboard</a>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('tableFilter')?.addEventListener('keyup', function () {
+            const query = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#attendanceTable tbody tr');
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
+            });
+        });
+    </script>
+}

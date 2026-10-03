@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+
+cookies.txt
+filelist.txt
+SmartAttendanceSystem/build.log
+SmartAttendanceSystem/wwwroot/uploads/faces/

@@ -1,0 +1,160 @@
+@model SmartAttendanceSystem.Models.LoginViewModel
+
+@{
+    ViewData["Title"] = "Sign In";
+}
+
+<div class="row justify-content-center align-items-center min-vh-75 py-4">
+    <div class="col-xl-10">
+        <div class="card border-0 shadow-xl overflow-hidden" style="border-radius: var(--radius-xl);">
+            <div class="row g-0">
+                <!-- Left: Branding & Feature Showcase -->
+                <div class="col-lg-6 p-4 p-md-5 d-flex flex-column justify-content-between text-white" style="background: var(--gradient-dark); position: relative; overflow: hidden;">
+                    <div class="hero-glow-circle" style="top: -50px; right: -50px; width: 350px; height: 350px;"></div>
+                    <div style="position: absolute; bottom: -80px; left: -80px; width: 250px; height: 250px; border-radius: 50%; background: radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, transparent 70%);"></div>
+
+                    <div style="position: relative; z-index: 2;">
+                        <div class="d-inline-flex align-items-center gap-2 mb-4 px-3 py-1 rounded-pill bg-white bg-opacity-10 border border-white border-opacity-15">
+                            <span class="pulse-indicator"></span>
+                            <span class="small fw-semibold text-white">AI Biometric System v2.5</span>
+                        </div>
+
+                        <h2 class="display-6 fw-bold text-white mb-3">Smart Attendance Platform</h2>
+                        <p class="text-white-50 lead fs-6 mb-4">
+                            Seamless automated student attendance tracking powered by facial recognition AI and dynamic cryptographic QR codes.
+                        </p>
+
+                        <!-- Feature highlights -->
+                        <div class="d-flex flex-column gap-3 mb-4">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="rounded-3 bg-primary bg-opacity-25 p-2 text-primary text-center" style="width: 42px; height: 42px;">
+                                    <i class="bi bi-camera-fill fs-5 text-white"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-semibold text-white">Face Recognition Check-in</div>
+                                    <small class="text-white-50">128-d neural biometric matching in under 1 second</small>
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="rounded-3 bg-success bg-opacity-25 p-2 text-success text-center" style="width: 42px; height: 42px;">
+                                    <i class="bi bi-qr-code-scan fs-5 text-white"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-semibold text-white">Dynamic QR Sessions</div>
+                                    <small class="text-white-50">Time-limited classroom attendance tokens</small>
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="rounded-3 bg-info bg-opacity-25 p-2 text-info text-center" style="width: 42px; height: 42px;">
+                                    <i class="bi bi-graph-up-arrow fs-5 text-white"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-semibold text-white">Real-time Analytics</div>
+                                    <small class="text-white-50">Automated student reporting and CSV data export</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="position: relative; z-index: 2;" class="pt-4 border-top border-white border-opacity-10 text-white-50 small">
+                        Secure Authentication &bull; Role-Based Governance &bull; Institutional Privacy
+                    </div>
+                </div>
+
+                <!-- Right: Sign In Form -->
+                <div class="col-lg-6 p-4 p-md-5 bg-white d-flex flex-column justify-content-center">
+                    <div class="mb-4">
+                        <div class="d-inline-flex p-3 rounded-circle bg-primary-light text-primary mb-3">
+                            <i class="bi bi-shield-lock-fill fs-3"></i>
+                        </div>
+                        <h3 class="fw-bold mb-1">Welcome Back</h3>
+                        <p class="text-muted small">Enter your credentials to access your dashboard</p>
+                    </div>
+
+                    <form asp-action="Login" asp-route-returnUrl="@ViewData["ReturnUrl"]" method="post">
+                        @Html.AntiForgeryToken()
+
+                        @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
+                        {
+                            <div class="alert alert-danger py-2 px-3 rounded-3 small mb-3">
+                                <i class="bi bi-exclamation-circle me-1"></i>
+                                @ViewData.ModelState[string.Empty]!.Errors.First().ErrorMessage
+                            </div>
+                        }
+
+                        <div class="mb-3">
+                            <label asp-for="Username" class="form-label">Username or Student ID</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0 text-muted">
+                                    <i class="bi bi-person"></i>
+                                </span>
+                                <input asp-for="Username" id="loginUsername" class="form-control border-start-0 ps-0" placeholder="e.g. admin or enrollment no." required autofocus />
+                            </div>
+                            <span asp-validation-for="Username" class="text-danger small"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label">Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0 text-muted">
+                                    <i class="bi bi-key"></i>
+                                </span>
+                                <input asp-for="Password" id="loginPassword" type="password" class="form-control border-start-0 ps-0" placeholder="••••••••" required />
+                                <button class="btn btn-outline-secondary border-start-0" type="button" id="togglePasswordBtn" style="border-color: var(--border-color);">
+                                    <i class="bi bi-eye" id="toggleEyeIcon"></i>
+                                </button>
+                            </div>
+                            <span asp-validation-for="Password" class="text-danger small"></span>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <div class="form-check">
+                                <input asp-for="RememberMe" class="form-check-input" id="rememberMeCheck" />
+                                <label class="form-check-label text-muted small" for="rememberMeCheck">Keep me signed in</label>
+                            </div>
+                            <span class="badge badge-soft-primary badge-pill">Institutional SSO</span>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 py-2 fs-6 shadow-sm">
+                            <i class="bi bi-box-arrow-in-right"></i> Sign In to Portal
+                        </button>
+                    </form>
+
+                    <!-- Quick Demo Credentials Selector for Convenience -->
+                    <div class="mt-4 pt-3 border-top">
+                        <small class="text-muted fw-bold text-uppercase d-block mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">
+                            Quick Fill Test Accounts:
+                        </small>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-sm btn-soft-primary" onclick="fillCreds('admin', 'Admin123!')">
+                                <i class="bi bi-shield-check"></i> Admin (admin)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        const toggleBtn = document.getElementById('togglePasswordBtn');
+        const passInput = document.getElementById('loginPassword');
+        const eyeIcon = document.getElementById('toggleEyeIcon');
+
+        toggleBtn.addEventListener('click', () => {
+            const isPassword = passInput.getAttribute('type') === 'password';
+            passInput.setAttribute('type', isPassword ? 'text' : 'password');
+            eyeIcon.className = isPassword ? 'bi bi-eye-slash' : 'bi bi-eye';
+        });
+
+        function fillCreds(u, p) {
+            document.getElementById('loginUsername').value = u;
+            document.getElementById('loginPassword').value = p;
+        }
+    </script>
+}

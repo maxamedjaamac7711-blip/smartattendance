@@ -1,0 +1,109 @@
+@model IEnumerable<SmartAttendanceSystem.Properties.Model.SchoolClass>
+
+@{
+    ViewData["Title"] = "Academic Classes";
+    var classes = Model.ToList();
+    var studentCounts = ViewBag.StudentCounts as Dictionary<int, int> ?? new Dictionary<int, int>();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <div class="d-flex align-items-center gap-2">
+            <h2 class="fw-bold mb-0">Academic Classes</h2>
+            <span class="badge badge-soft-primary badge-pill">@classes.Count Cohorts</span>
+        </div>
+        <p class="text-muted small mb-0 mt-1">Manage institutional student cohorts and faculty assignments</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Add New Class
+        </a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header card-header-clean d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0 fw-bold">Active Classes</h5>
+        <div class="d-flex align-items-center gap-2">
+            <input type="text" id="classSearch" class="form-control form-control-sm" placeholder="Search class or faculty..." style="width: 250px;" />
+        </div>
+    </div>
+    <div class="card-body p-0">
+        @if (classes.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-modern" id="classesTable">
+                    <thead>
+                        <tr>
+                            <th>Class Name</th>
+                            <th>Faculty Department</th>
+                            <th>Enrolled Students</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in classes)
+                        {
+                            var count = studentCounts.ContainsKey(c.Id) ? studentCounts[c.Id] : 0;
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="stat-icon bg-primary-subtle text-primary" style="width: 38px; height: 38px; font-size: 1.1rem;">
+                                            <i class="bi bi-mortarboard"></i>
+                                        </div>
+                                        <div class="fw-bold text-dark">@c.Name</div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge badge-soft-dark badge-pill">@(c.Faculty?.Name ?? "Unassigned")</span>
+                                </td>
+                                <td>
+                                    <span class="badge badge-soft-info badge-pill">@count Students</span>
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-flex justify-content-end gap-1">
+                                        <a asp-controller="Attendance" asp-action="ClassAttendance" asp-route-classId="@c.Id" class="btn btn-sm btn-outline-info" title="Today's Attendance">
+                                            <i class="bi bi-list-check"></i>
+                                        </a>
+                                        <a asp-action="Edit" asp-route-id="@c.Id" class="btn btn-sm btn-outline-primary" title="Edit Class">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <form asp-action="Delete" asp-route-id="@c.Id" method="post" class="d-inline" onsubmit="return confirm('Delete class @c.Name?');">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-building fs-1 d-block mb-2"></i>
+                <h6>No classes created yet.</h6>
+                <a asp-action="Create" class="btn btn-primary btn-sm mt-2">
+                    <i class="bi bi-plus-circle"></i> Add First Class
+                </a>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('classSearch')?.addEventListener('keyup', function () {
+            const query = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#classesTable tbody tr');
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
+            });
+        });
+    </script>
+}

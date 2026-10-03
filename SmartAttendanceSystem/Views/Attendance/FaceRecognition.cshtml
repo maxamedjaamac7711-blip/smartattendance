@@ -1,0 +1,400 @@
+@{
+    ViewData["Title"] = "Face Recognition Attendance";
+    var session = ViewBag.Session as SmartAttendanceSystem.Properties.Model.AttendanceSession;
+    var studentsJson = ViewBag.StudentsJson as string;
+}
+
+<!-- Header & Session Overview -->
+<div class="hero-gradient-banner mb-4 p-4 p-md-4 rounded-4" style="background: var(--gradient-dark); position: relative; overflow: hidden; border-radius: var(--radius-xl);">
+    <div class="hero-glow-circle" style="top: -60px; right: -60px;"></div>
+    <div class="row align-items-center g-3" style="position: relative; z-index: 2;">
+        <div class="col-lg-7">
+            <div class="d-inline-flex align-items-center gap-2 mb-2 px-3 py-1 rounded-pill bg-white bg-opacity-10 border border-white border-opacity-15">
+                <span class="pulse-indicator"></span>
+                <span class="small fw-semibold text-white">Biometric Kiosk &bull; Live Session</span>
+            </div>
+            <h2 class="h3 fw-bold text-white mb-1">@session.Subject</h2>
+            <p class="text-white-50 small mb-0">
+                <i class="bi bi-mortarboard me-1"></i> Class: <strong>@session.Class?.Name</strong> &nbsp;|&nbsp; 
+                <i class="bi bi-clock me-1"></i> Started: @session.CreatedAt.ToLocalTime().ToString("hh:mm tt")
+            </p>
+        </div>
+        <div class="col-lg-5 text-lg-end">
+            <div class="d-inline-flex gap-2 bg-white bg-opacity-10 p-2 rounded-4 border border-white border-opacity-15">
+                <div class="px-3 py-1 text-center border-end border-white border-opacity-15">
+                    <div class="h4 fw-bold text-white mb-0" id="attendanceCount">0</div>
+                    <small class="text-white-50" style="font-size: 0.72rem; text-transform: uppercase;">Present</small>
+                </div>
+                <div class="px-3 py-1 text-center">
+                    <div class="h4 fw-bold text-white mb-0" id="enrolledCount">@(System.Text.Json.JsonSerializer.Deserialize<dynamic[]>(studentsJson)?.Length ?? 0)</div>
+                    <small class="text-white-50" style="font-size: 0.72rem; text-transform: uppercase;">Enrolled</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Camera Viewport Column -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-lg overflow-hidden" style="border-radius: var(--radius-xl); background: #0f172a;">
+            <div class="card-header bg-transparent border-0 px-4 pt-3 pb-2 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2 text-white">
+                    <i class="bi bi-camera-video text-primary"></i>
+                    <span class="fw-semibold small">Biometric Camera Stream</span>
+                </div>
+                <span class="badge badge-soft-primary" id="kioskStatusBadge">Camera Standby</span>
+            </div>
+
+            <div class="card-body p-3 p-md-4">
+                <div class="scanner-frame position-relative rounded-4 overflow-hidden d-flex align-items-center justify-content-center bg-black" style="min-height: 480px; border: 2px solid rgba(79, 70, 229, 0.4); box-shadow: inset 0 0 30px rgba(0,0,0,0.8);">
+                    <video id="video" autoplay muted playsinline style="width: 100%; max-height: 480px; object-fit: cover; transform: rotateY(180deg); display: none;"></video>
+                    <canvas id="overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: rotateY(180deg); pointer-events: none;"></canvas>
+                    
+                    <div id="noCameraMessage" class="text-center text-white p-4">
+                        <div class="user-avatar-bubble avatar-lg mb-3 shadow-lg" style="background: rgba(255,255,255,0.08); border: 2px dashed rgba(255,255,255,0.25);">
+                            <i class="bi bi-camera-video fs-1 text-white"></i>
+                        </div>
+                        <h5 class="fw-bold mb-1">Camera Offline</h5>
+                        <p class="text-white-50 small mb-0">Click "Start Live Detection" below to activate biometric verification</p>
+                    </div>
+
+                    <!-- Cyber Targeting Reticle Overlay -->
+                    <div class="position-absolute border border-primary border-opacity-25 rounded-4" style="width: 240px; height: 300px; pointer-events: none;"></div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2 flex-wrap align-items-center justify-content-between">
+                    <div class="d-flex gap-2">
+                        <button id="startCamera" class="btn btn-primary px-4 shadow">
+                            <i class="bi bi-play-circle-fill me-1"></i> Start Live Detection
+                        </button>
+                        <button id="stopCamera" class="btn btn-outline-danger px-4" disabled>
+                            <i class="bi bi-stop-circle me-1"></i> Stop Camera
+                        </button>
+                    </div>
+                    <a asp-action="QR" asp-route-id="@session.Id" class="btn btn-outline-light btn-sm">
+                        <i class="bi bi-qr-code me-1"></i> Switch to QR Code
+                    </a>
+                </div>
+
+                <div id="recognitionStatus" class="mt-3 text-center fw-medium text-white-50 small"></div>
+                <div id="detectedFaces" class="mt-2 text-center text-white small"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Live Roster Column -->
+    <div class="col-lg-4">
+        <!-- Recognized Card -->
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: var(--radius-lg);">
+            <div class="card-header card-header-clean d-flex align-items-center justify-content-between">
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-check2-circle me-2 text-success"></i>Live Recognized
+                </h6>
+                <span class="badge badge-soft-success">Real-Time</span>
+            </div>
+            <div class="card-body p-3" style="max-height: 250px; overflow-y: auto;">
+                <div class="list-group list-group-flush gap-2" id="recognizedList">
+                    <div class="text-center py-4 text-muted small">
+                        <i class="bi bi-person-bounding-box fs-2 d-block mb-1 text-muted opacity-50"></i>
+                        No students recognized yet in this session
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Class Enrolled Roster -->
+        <div class="card border-0 shadow-sm" style="border-radius: var(--radius-lg);">
+            <div class="card-header card-header-clean d-flex align-items-center justify-content-between">
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-people me-2 text-primary"></i>Enrolled Students
+                </h6>
+                <small class="text-muted">Biometric Ready</small>
+            </div>
+            <div class="card-body p-3" style="max-height: 320px; overflow-y: auto;">
+                <div class="list-group list-group-flush gap-1" id="allStudentsList">
+                    @{
+                        var students = System.Text.Json.JsonSerializer.Deserialize<dynamic[]>(studentsJson);
+                        if (students != null && students.Length > 0)
+                        {
+                            foreach (var s in students)
+                            {
+                                var name = s.name?.ToString() ?? "";
+                                var enrollment = s.enrollment?.ToString() ?? "";
+                                var initial = name.Length > 0 ? name.Substring(0, 1).ToUpper() : "S";
+                                <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-2 rounded-3 border-0 mb-1 bg-light" data-student-id="@s.id">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="user-avatar-bubble" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                                            @initial
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark small lh-sm">@name</div>
+                                            <small class="text-muted" style="font-size: 0.72rem;">@enrollment</small>
+                                        </div>
+                                    </div>
+                                    <span class="badge bg-secondary-subtle text-secondary rounded-pill" id="status-@s.id" style="font-size: 0.7rem;">Waiting</span>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-center py-4 text-muted small">
+                                <i class="bi bi-exclamation-circle fs-3 d-block mb-2 text-warning"></i>
+                                No enrolled biometric students found for this class.
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import * as faceapi from '/lib/face-api/face-api.min.js';
+
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const startBtn = document.getElementById('startCamera');
+    const stopBtn = document.getElementById('stopCamera');
+    const recognitionStatus = document.getElementById('recognitionStatus');
+    const recognizedList = document.getElementById('recognizedList');
+    const attendanceCount = document.getElementById('attendanceCount');
+    const detectedFaces = document.getElementById('detectedFaces');
+    const noCameraMessage = document.getElementById('noCameraMessage');
+
+    const sessionToken = '@session.Token';
+    const studentsData = @Html.Raw(studentsJson);
+    
+    let stream = null;
+    let modelsLoaded = false;
+    let faceMatcher = null;
+    let recognizedStudents = new Set();
+    let detectionInterval = null;
+
+    // Build face matcher from enrolled students
+    function buildFaceMatcher() {
+        const labeledDescriptors = studentsData
+            .filter(s => s.embedding)
+            .map(s => {
+                const embedding = JSON.parse(s.embedding);
+                return new faceapi.LabeledFaceDescriptors(s.name, [new Float32Array(embedding)]);
+            });
+        
+        if (labeledDescriptors.length > 0) {
+            faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
+        }
+    }
+
+    async function loadModels() {
+        try {
+            recognitionStatus.innerHTML = '<div class="text-info">Loading face detection models...</div>';
+            await faceapi.nets.tinyFaceDetector.loadFromUri('/lib/face-api/weights');
+            await faceapi.nets.faceLandmark68Net.loadFromUri('/lib/face-api/weights');
+            await faceapi.nets.faceRecognitionNet.loadFromUri('/lib/face-api/weights');
+            
+            buildFaceMatcher();
+            
+            modelsLoaded = true;
+            recognitionStatus.innerHTML = '<div class="text-success">Models loaded. Click "Start Camera" to begin face recognition.</div>';
+            startBtn.disabled = false;
+        } catch (err) {
+            recognitionStatus.innerHTML = '<div class="text-danger">Failed to load models: ' + err.message + '</div>';
+        }
+    }
+
+    async function startCamera() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 480, facingMode: 'user' },
+                audio: false
+            });
+            video.srcObject = stream;
+            video.style.display = 'block';
+            noCameraMessage.style.display = 'none';
+            
+            await video.play();
+            
+            overlay.width = video.videoWidth;
+            overlay.height = video.videoHeight;
+            
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            recognitionStatus.innerHTML = '<div class="text-success"><i class="bi bi-broadcast me-1"></i> Biometric scanning active. Detecting faces...</div>';
+            const kioskBadge = document.getElementById('kioskStatusBadge');
+            if (kioskBadge) {
+                kioskBadge.className = 'badge badge-soft-success';
+                kioskBadge.innerHTML = '<span class="pulse-indicator me-1"></span> Active Scanning';
+            }
+            
+            detectLoop();
+        } catch (err) {
+            recognitionStatus.innerHTML = '<div class="text-danger">Camera access denied: ' + err.message + '</div>';
+            startBtn.disabled = false;
+        }
+    }
+
+    function stopCamera() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+        if (detectionInterval) {
+            clearInterval(detectionInterval);
+            detectionInterval = null;
+        }
+        video.style.display = 'none';
+        video.srcObject = null;
+        noCameraMessage.style.display = 'block';
+        const ctx = overlay.getContext('2d');
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        recognitionStatus.innerHTML = '<div class="text-white-50">Camera stopped.</div>';
+        const kioskBadge = document.getElementById('kioskStatusBadge');
+        if (kioskBadge) {
+            kioskBadge.className = 'badge badge-soft-primary';
+            kioskBadge.textContent = 'Camera Standby';
+        }
+    }
+
+    async function detectLoop() {
+        if (!stream || video.paused || video.ended) return;
+        
+        const displaySize = { width: video.videoWidth, height: video.videoHeight };
+        faceapi.matchDimensions(overlay, displaySize);
+        
+        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks()
+            .withFaceDescriptors();
+        
+        const ctx = overlay.getContext('2d');
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+        
+        if (detections.length > 0) {
+            const resizedDetections = faceapi.resizeResults(detections, displaySize);
+            
+            // Draw detections
+            faceapi.draw.drawDetections(overlay, resizedDetections);
+            faceapi.draw.drawFaceLandmarks(overlay, resizedDetections);
+            
+            // Process each face
+            for (const detection of resizedDetections) {
+                if (faceMatcher && detection.descriptor) {
+                    const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+                    const label = bestMatch.toString();
+                    const distance = bestMatch.distance;
+                    
+                    // Draw label on canvas
+                    const box = detection.detection.box;
+                    const drawBox = new faceapi.draw.DrawBox(box, { label: label });
+                    drawBox.draw(overlay);
+                    
+                    // Check if recognized (not unknown)
+                    if (label !== 'unknown') {
+                        // Extract student name from label (format: "Name (distance)")
+                        const studentName = label.split(' (')[0];
+                        
+                        if (!recognizedStudents.has(studentName)) {
+                            recognizedStudents.add(studentName);
+                            await markAttendance(studentName, distance);
+                        }
+                    }
+                }
+            }
+            
+            detectedFaces.innerHTML = `<small class="text-muted">Faces detected: ${detections.length}</small>`;
+        } else {
+            detectedFaces.innerHTML = '<small class="text-muted">No faces detected</small>';
+        }
+        
+        detectionInterval = requestAnimationFrame(detectLoop);
+    }
+
+    function playSuccessChime() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.35);
+        } catch(e) {}
+    }
+
+    async function markAttendance(studentName, distance) {
+        // Find student in data
+        const student = studentsData.find(s => s.name === studentName);
+        if (!student) return;
+        
+        // Play high-tech recognition sound
+        playSuccessChime();
+
+        // Update UI Badge
+        const statusBadge = document.getElementById(`status-${student.id}`);
+        if (statusBadge) {
+            statusBadge.textContent = 'Present ✓';
+            statusBadge.className = 'badge badge-soft-success py-1 px-2';
+        }
+        
+        // Add to recognized list
+        updateRecognizedList();
+        
+        // Send to server with studentId and session token
+        try {
+            const response = await fetch('/Attendance/CheckFace', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: JSON.stringify({
+                    token: sessionToken,
+                    studentId: student.id,
+                    embedding: Array.from(student.embedding ? JSON.parse(student.embedding) : [])
+                })
+            });
+            
+            const result = await response.json();
+            console.log('Attendance result:', result);
+            if (result.success) {
+                recognitionStatus.innerHTML = `<span class="badge bg-success py-2 px-3 fs-7 shadow-sm"><i class="bi bi-check-circle me-1"></i> Verified: ${studentName}</span>`;
+            }
+        } catch (err) {
+            console.error('Attendance error:', err);
+        }
+    }
+
+    function updateRecognizedList() {
+        if (recognizedStudents.size === 0) {
+            recognizedList.innerHTML = '<div class="list-group-item text-muted text-center py-4">No students recognized yet</div>';
+        } else {
+            recognizedList.innerHTML = '';
+            recognizedStudents.forEach(name => {
+                const item = document.createElement('div');
+                item.className = 'list-group-item list-group-item-success d-flex justify-content-between align-items-center';
+                item.innerHTML = `
+                    <div>
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                        <strong class="ms-2">${name}</strong>
+                    </div>
+                    <small class="text-muted">Present</small>
+                `;
+                recognizedList.appendChild(item);
+            });
+        }
+        attendanceCount.textContent = `${recognizedStudents.size} Present`;
+    }
+
+    startBtn.addEventListener('click', startCamera);
+    stopBtn.addEventListener('click', stopCamera);
+
+    // Load models on page load
+    loadModels();
+</script>

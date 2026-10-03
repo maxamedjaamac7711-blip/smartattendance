@@ -1,0 +1,511 @@
+@{
+    ViewData["Title"] = "Face Biometric Enrollment";
+    var studentId = ViewBag.StudentId;
+    var studentName = ViewBag.StudentName;
+    var isEnrolled = (bool)(ViewBag.IsEnrolled ?? false);
+}
+
+<!-- Hero Header -->
+<div class="hero-gradient-banner mb-4 p-4 p-md-4 rounded-4" style="background: var(--gradient-dark); position: relative; overflow: hidden; border-radius: var(--radius-xl);">
+    <div class="hero-glow-circle" style="top: -60px; right: -60px;"></div>
+    <div class="row align-items-center g-3" style="position: relative; z-index: 2;">
+        <div class="col-lg-8">
+            <div class="d-inline-flex align-items-center gap-2 mb-2 px-3 py-1 rounded-pill bg-white bg-opacity-10 border border-white border-opacity-15">
+                <span class="pulse-indicator"></span>
+                <span class="small fw-semibold text-white">Biometric AI Pipeline &bull; Enrollment</span>
+            </div>
+            <h2 class="h3 fw-bold text-white mb-1">Face Biometric Enrollment</h2>
+            <p class="text-white-50 small mb-0">
+                Student Profile: <strong class="text-white">@studentName</strong> (ID: @studentId)
+            </p>
+        </div>
+        <div class="col-lg-4 text-lg-end">
+            @if (isEnrolled)
+            {
+                <span class="badge badge-soft-success badge-pill py-2 px-3 fs-7">
+                    <i class="bi bi-shield-check me-1"></i> Biometrics Enrolled
+                </span>
+            }
+            else
+            {
+                <span class="badge badge-soft-warning badge-pill py-2 px-3 fs-7">
+                    <i class="bi bi-shield-exclamation me-1"></i> Awaiting Biometric Data
+                </span>
+            }
+        </div>
+    </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+<div class="row g-4 mb-4">
+    <!-- Camera Viewport Card -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-lg overflow-hidden" style="border-radius: var(--radius-xl); background: #0f172a;">
+            <div class="card-header bg-transparent border-0 px-4 pt-3 pb-2 d-flex justify-content-between align-items-center text-white">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-camera-video text-primary"></i>
+                    <span class="fw-semibold small">Live Biometric Capture Feed</span>
+                </div>
+                <span class="badge badge-soft-primary" id="enrollBadge">Camera Ready</span>
+            </div>
+
+            <div class="card-body p-3 p-md-4">
+                <div class="scanner-frame position-relative rounded-4 overflow-hidden d-flex align-items-center justify-content-center bg-black" style="min-height: 420px; border: 2px solid rgba(79, 70, 229, 0.4); box-shadow: inset 0 0 30px rgba(0,0,0,0.8);">
+                    <video id="video" autoplay muted playsinline style="width: 100%; max-height: 420px; object-fit: cover; transform: rotateY(180deg); display: none;"></video>
+                    <canvas id="canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: rotateY(180deg); pointer-events: none; display: none;"></canvas>
+                    
+                    <div id="noCameraMessage" class="text-center text-white p-4">
+                        <div class="user-avatar-bubble avatar-lg mb-3 shadow-lg" style="background: rgba(255,255,255,0.08); border: 2px dashed rgba(255,255,255,0.25);">
+                            <i class="bi bi-person-bounding-box fs-1 text-white"></i>
+                        </div>
+                        <h5 class="fw-bold mb-1">Camera Feed Offline</h5>
+                        <p class="text-white-50 small mb-0">Click "Start Camera" to initialize the neural face detector</p>
+                    </div>
+
+                    <!-- Target Reticle -->
+                    <div class="position-absolute border border-primary border-opacity-25 rounded-4" style="width: 220px; height: 280px; pointer-events: none;"></div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2 flex-wrap">
+                    <button id="startCamera" class="btn btn-primary px-4 shadow">
+                        <i class="bi bi-camera-video-fill me-1"></i> Start Camera
+                    </button>
+                    <button id="captureFace" class="btn btn-success px-4" disabled>
+                        <i class="bi bi-camera me-1"></i> Capture Face Descriptor
+                    </button>
+                    <button id="retakeFace" class="btn btn-outline-light px-3" style="display: none;">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Retake Photo
+                    </button>
+                </div>
+
+                <div id="faceStatus" class="mt-3 text-center fw-medium text-white-50 small"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar: Captured Preview & Instructions -->
+    <div class="col-lg-4">
+        <!-- Captured Snapshot Card -->
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: var(--radius-lg);">
+            <div class="card-header card-header-clean d-flex align-items-center justify-content-between">
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-image me-2 text-primary"></i>Captured Biometric Face
+                </h6>
+            </div>
+            <div class="card-body p-3">
+                <div class="rounded-4 bg-dark d-flex align-items-center justify-content-center overflow-hidden mb-3" style="min-height: 200px; border: 1px solid var(--border-color);">
+                    <img id="capturedImage" src="" alt="Captured face" class="img-fluid rounded-3" style="display: none; max-height: 200px; object-fit: cover;" />
+                    <div id="capturedPlaceholder" class="text-center text-muted p-4">
+                        <i class="bi bi-camera fs-1 d-block mb-2 text-muted opacity-50"></i>
+                        <small>No face descriptor captured yet</small>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="fw-semibold text-muted">Detection Confidence</small>
+                        <span id="confidenceText" class="badge badge-soft-success">0%</span>
+                    </div>
+                    <div class="progress rounded-pill" style="height: 8px;">
+                        <div id="confidenceBar" class="progress-bar bg-success rounded-pill" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <button type="button" id="saveFace" class="btn btn-success w-100 py-2 fw-semibold shadow-sm" disabled>
+                    <i class="bi bi-cloud-arrow-up-fill me-1"></i> Save Face Enrollment
+                </button>
+            </div>
+        </div>
+
+        <!-- Instructions Card -->
+        <div class="card border-0 shadow-sm" style="border-radius: var(--radius-lg);">
+            <div class="card-header card-header-clean">
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-lightbulb me-2 text-warning"></i>Enrollment Guidelines
+                </h6>
+            </div>
+            <div class="card-body p-3">
+                <ul class="list-unstyled small mb-0 d-flex flex-column gap-2 text-muted">
+                    <li class="d-flex align-items-start gap-2">
+                        <i class="bi bi-check-circle-fill text-success mt-1"></i>
+                        <span>Center your face directly in the target rectangle.</span>
+                    </li>
+                    <li class="d-flex align-items-start gap-2">
+                        <i class="bi bi-check-circle-fill text-success mt-1"></i>
+                        <span>Ensure bright and even facial lighting without back glare.</span>
+                    </li>
+                    <li class="d-flex align-items-start gap-2">
+                        <i class="bi bi-check-circle-fill text-success mt-1"></i>
+                        <span>Maintain a neutral, forward-looking facial expression.</span>
+                    </li>
+                    <li class="d-flex align-items-start gap-2">
+                        <i class="bi bi-check-circle-fill text-success mt-1"></i>
+                        <span>Click <strong>Capture</strong> once the green detection box appears.</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/lib/face-api/face-api.min.js"></script>
+<script>
+    var video = document.getElementById('video');
+    var canvas = document.getElementById('canvas');
+    var startBtn = document.getElementById('startCamera');
+    var captureBtn = document.getElementById('captureFace');
+    var retakeBtn = document.getElementById('retakeFace');
+    var saveBtn = document.getElementById('saveFace');
+    var capturedImage = document.getElementById('capturedImage');
+    var capturedPlaceholder = document.getElementById('capturedPlaceholder');
+    var confidenceBar = document.getElementById('confidenceBar');
+    var confidenceText = document.getElementById('confidenceText');
+    var faceStatus = document.getElementById('faceStatus');
+    var noCameraMessage = document.getElementById('noCameraMessage');
+
+    const studentId = @studentId;
+
+    var stream = null;
+    var modelsLoaded = false;
+    var lastDetection = null;
+    var faceCaptured = false;
+    var capturedImageData = null;
+    var detecting = false;
+
+    const antiforgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+    async function loadModels() {
+        if (modelsLoaded) return true;
+        faceStatus.innerHTML = '<div class="text-info">Loading face detection models...</div>';
+        try {
+            await faceapi.nets.tinyFaceDetector.loadFromUri('/lib/face-api/weights');
+            await faceapi.nets.faceLandmark68Net.loadFromUri('/lib/face-api/weights');
+            await faceapi.nets.faceRecognitionNet.loadFromUri('/lib/face-api/weights');
+            modelsLoaded = true;
+            faceStatus.innerHTML = '<div class="text-success">Models loaded.</div>';
+            return true;
+        } catch (err) {
+            console.error('Model loading failed:', err);
+            faceStatus.innerHTML = '<div class="text-danger">Failed to load models: ' + err.message + '</div>';
+            modelsLoaded = false;
+            return false;
+        }
+    }
+
+    async function startCamera() {
+        if (!modelsLoaded) {
+            var loaded = await loadModels();
+            if (!loaded) {
+                faceStatus.innerHTML = '<div class="text-danger">Models failed to load.</div>';
+                return;
+            }
+        }
+
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Starting...';
+
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("Your browser does not support camera access.");
+            }
+
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 480, facingMode: 'user' },
+                audio: false
+            });
+
+            video.srcObject = stream;
+            video.style.display = 'block';
+            canvas.style.display = 'block';
+            noCameraMessage.style.display = 'none';
+
+            await video.play();
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            startBtn.style.display = 'none';
+            captureBtn.style.display = 'inline-block';
+            captureBtn.disabled = true;
+
+            faceStatus.innerHTML = '<div class="text-success">Camera started. Look at the camera.</div>';
+            detectLoop();
+        } catch (err) {
+            faceStatus.innerHTML = '<div class="text-danger">Camera access denied: ' + err.message + '</div>';
+            startBtn.disabled = false;
+            startBtn.innerHTML = '<i class="bi bi-camera-video"></i> Start Camera';
+        }
+    }
+
+    async function detectLoop() {
+        if (!stream || video.paused || video.ended) return;
+
+        var displaySize = { width: video.videoWidth, height: video.videoHeight };
+        faceapi.matchDimensions(canvas, displaySize);
+
+        try {
+            var detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.3 }))
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            var ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (detection) {
+                lastDetection = detection;
+                var resized = faceapi.resizeResults(detection, displaySize);
+                faceapi.draw.drawDetections(canvas, resized);
+                faceapi.draw.drawFaceLandmarks(canvas, resized);
+
+                var confidence = (detection.detection.score * 100).toFixed(1);
+                confidenceBar.style.width = confidence + '%';
+                confidenceText.textContent = confidence + '%';
+                faceStatus.innerHTML = '<div class="text-success">Face detected! Confidence: ' + confidence + '%</div>';
+
+                if (confidence >= 70) {
+                    captureBtn.disabled = false;
+                    captureBtn.style.display = 'inline-block';
+                }
+            } else {
+                lastDetection = null;
+                confidenceBar.style.width = '0%';
+                confidenceText.textContent = '0%';
+                faceStatus.innerHTML = '<div class="text-warning">No face detected. Adjust position.</div>';
+                captureBtn.disabled = true;
+            }
+        } catch (err) {
+            console.error('Detection error:', err);
+            faceStatus.innerHTML = '<div class="text-danger">Detection error: ' + err.message + '</div>';
+        }
+
+        requestAnimationFrame(detectLoop);
+    }
+
+    async function captureFace() {
+
+        if (!lastDetection) {
+            faceStatus.innerHTML =
+                '<div class="text-danger">No face detected. Try again.</div>';
+            return;
+        }
+
+        try {
+
+            // Get the 128-dimensional face embedding
+            const descriptor = lastDetection.descriptor;
+
+            // Convert Float32Array to normal array
+            const embedding = Array.from(descriptor);
+
+            // Capture current video frame
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+
+            const imageData = canvas.toDataURL('image/jpeg', 0.9);
+
+            // Save captured image
+            capturedImageData = imageData;
+
+            // Show captured image
+            capturedImage.src = imageData;
+            capturedImage.style.display = 'block';
+            capturedPlaceholder.style.display = 'none';
+
+            // Stop camera
+            stopCamera();
+
+            // Mark face as captured
+            faceCaptured = true;
+
+            captureBtn.style.display = 'none';
+            retakeBtn.style.display = 'inline-block';
+
+            // IMPORTANT: enable Save button
+            saveBtn.disabled = false;
+            saveBtn.removeAttribute('disabled');
+            saveBtn.style.pointerEvents = 'auto';
+            saveBtn.style.cursor = 'pointer';
+
+            console.log("Face captured successfully");
+            console.log("Embedding length:", embedding.length);
+            console.log("Save button disabled:", saveBtn.disabled);
+
+            faceStatus.innerHTML =
+                '<div class="text-success">' +
+                'Face captured successfully. Click ' +
+                '<strong>Save Face Enrollment</strong>.' +
+                '</div>';
+
+        } catch (error) {
+
+            console.error("Capture error:", error);
+
+            faceStatus.innerHTML =
+                '<div class="text-danger">' +
+                'Capture failed: ' + error.message +
+                '</div>';
+        }
+    }
+
+    function stopCamera() {
+        if (stream) {
+            stream.getTracks().forEach(function (track) {
+                track.stop();
+            });
+            stream = null;
+        }
+        video.pause();
+        video.style.display = 'none';
+        canvas.style.display = 'none';
+        video.srcObject = null;
+        noCameraMessage.style.display = 'flex';
+    }
+
+    function retakeFace() {
+        faceCaptured = false;
+        lastDetection = null;
+        capturedImageData = null;
+
+        capturedImage.style.display = 'none';
+        capturedImage.src = '';
+        capturedPlaceholder.style.display = 'block';
+
+        captureBtn.style.display = 'inline-block';
+        retakeBtn.style.display = 'none';
+        saveBtn.disabled = true;
+        saveBtn.setAttribute('disabled', 'disabled');
+
+        confidenceBar.style.width = '0%';
+        confidenceText.textContent = '0%';
+
+        startCamera();
+    }
+
+    async function saveFace() {
+
+        console.log("SAVE BUTTON CLICKED");
+
+        if (!faceCaptured) {
+            faceStatus.innerHTML =
+                '<div class="text-danger">' +
+                'Please capture your face first.' +
+                '</div>';
+            return;
+        }
+
+        if (!lastDetection) {
+            faceStatus.innerHTML =
+                '<div class="text-danger">' +
+                'Face data is missing. Please capture again.' +
+                '</div>';
+            return;
+        }
+
+        if (!capturedImageData) {
+            faceStatus.innerHTML =
+                '<div class="text-danger">' +
+                'Captured image is missing. Please capture again.' +
+                '</div>';
+            return;
+        }
+
+        try {
+
+            saveBtn.disabled = true;
+
+            saveBtn.innerHTML =
+                '<span class="spinner-border spinner-border-sm"></span> Saving...';
+
+            faceStatus.innerHTML =
+                '<div class="text-info">Saving face enrollment...</div>';
+
+            // Get face embedding
+            const embedding =
+                Array.from(lastDetection.descriptor);
+
+            const response = await fetch(
+                `/Student/SaveFaceEmbedding?studentId=${studentId}`,
+                {
+                    method: 'POST',
+
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': antiforgeryToken
+                    },
+
+                    body: JSON.stringify({
+                        embedding: embedding,
+                        imageData: capturedImageData
+                    })
+                }
+            );
+
+            const result = await response.json();
+
+            console.log("Save result:", result);
+
+            if (result.success) {
+
+                faceStatus.innerHTML =
+                    '<div class="text-success">' +
+                    '<strong>Face enrollment saved successfully!</strong>' +
+                    '</div>';
+
+                saveBtn.innerHTML =
+                    '<i class="bi bi-check-circle"></i> Saved Successfully';
+
+            } else {
+
+                throw new Error(
+                    result.message || "Face enrollment failed."
+                );
+            }
+
+        } catch (error) {
+
+            console.error("Save error:", error);
+
+            faceStatus.innerHTML =
+                '<div class="text-danger">' +
+                'Save failed: ' + error.message +
+                '</div>';
+
+            saveBtn.disabled = false;
+
+            saveBtn.innerHTML =
+                '<i class="bi bi-save"></i> Save Face Enrollment';
+        }
+    }
+
+    // Event listeners
+    startBtn.addEventListener('click', startCamera);
+
+    captureBtn.addEventListener('click', captureFace);
+
+    retakeBtn.addEventListener('click', retakeFace);
+
+    saveBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+
+        console.log("Save button clicked!");
+
+        saveFace();
+    });
+
+    // Load models on page load
+    loadModels();
+</script>
+
+<style>
+    #canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+    .border-dark {
+        border-color: #343a40 !important;
+    }
+</style>

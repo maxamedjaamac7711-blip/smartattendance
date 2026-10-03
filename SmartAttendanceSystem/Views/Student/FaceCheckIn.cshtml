@@ -1,0 +1,317 @@
+@{
+    ViewData["Title"] = "Face Check-in";
+    var sessions = ViewBag.Sessions as List<SmartAttendanceSystem.Properties.Model.AttendanceSession>;
+    var student = ViewBag.Student as SmartAttendanceSystem.Properties.Model.Student;
+}
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-primary text-white">
+        <h3 class="mb-0">Face Recognition Check-in</h3>
+    </div>
+    <div class="card-body p-4">
+        <div class="alert alert-info">
+            <h5>Active Sessions for Your Class</h5>
+            <p class="mb-0">Select a session and scan your face to mark attendance.</p>
+        </div>
+
+        @if (sessions == null || sessions.Count == 0)
+        {
+            <div class="text-center py-5">
+                <div class="display-1">📭</div>
+                <h4 class="mt-3">No Active Face Recognition Sessions</h4>
+                <p class="text-muted">Your teacher hasn't started a face recognition attendance session yet.</p>
+                <a asp-action="Dashboard" class="btn btn-primary">Back to Dashboard</a>
+            </div>
+        }
+        else
+        {
+            <div class="row g-3 mb-4">
+                @foreach (var session in sessions)
+                {
+                    <div class="col-md-6">
+                        <div class="card h-100 border-primary session-card" data-session-id="@session.Id" data-session-token="@session.Token">
+                            <div class="card-body">
+                                <h5 class="card-title">@session.Subject</h5>
+                                <p class="card-text text-muted mb-1">
+                                    <i class="bi bi-clock"></i> Started: @session.CreatedAt.ToLocalTime()
+                                </p>
+                                <p class="card-text text-muted mb-1">
+                                    <i class="bi bi-hourglass-split"></i> Expires: @session.ExpiresAt.ToLocalTime()
+                                </p>
+                                <button class="btn btn-primary w-100 select-session-btn" data-session-id="@session.Id" data-session-token="@session.Token">
+                                    <i class="bi bi-camera"></i> Start Face Check-in
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- Face Recognition Modal Area -->
+            <div id="faceRecognitionArea" style="display: none;">
+                <hr />
+                <h4>Face Recognition: <span id="currentSessionSubject"></span></h4>
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <div class="border rounded-4 bg-dark d-flex align-items-center justify-content-center" style="min-height: 480px; position: relative;">
+                            <video id="video" autoplay muted playsinline style="max-width: 100%; max-height: 480px; transform: rotateY(180deg);"></video>
+                            <canvas id="overlay" style="position: absolute; top: 0; left: 0; transform: rotateY(180deg);"></canvas>
+                            <div id="noCameraMessage" class="text-center text-white">
+                                <div class="display-1">📷</div>
+                                <div class="mt-3 fw-semibold">Initializing camera...</div>
+                            </div>
+                        </div>
+                        <div class="mt-3 d-flex gap-2 flex-wrap">
+                            <button id="startCamera" class="btn btn-success">
+                                <i class="bi bi-camera-video"></i> Start Camera
+                            </button>
+                            <button id="stopCamera" class="btn btn-danger" disabled>
+                                <i class="bi bi-camera-video-off"></i> Stop Camera
+                            </button>
+                        </div>
+                        <div id="recognitionStatus" class="mt-3 text-center"></div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card border-0 bg-light h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Your Status</h5>
+                                <div class="text-center py-4">
+                                    <div id="studentAvatar" class="rounded-circle bg-primary-subtle text-primary fw-bold d-inline-flex align-items-center justify-content-center" style="width: 100px; height: 100px; font-size: 2.5rem;">
+                                        @(student.Name.Substring(0,1).ToUpper())
+                                    </div>
+                                    <h5 class="mt-3" id="studentNameDisplay">@student.Name</h5>
+                                    <p class="text-muted" id="studentEnrollmentDisplay">@student.EnrollmentNumber</p>
+                                    <hr />
+                                    <div id="checkinStatus" class="text-center">
+                                        <div class="display-4 text-muted">⏳</div>
+                                        <h4 class="text-muted">Waiting for face scan...</h4>
+                                        <p class="text-muted">Position your face in the camera view</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<script type="module">
+    import * as faceapi from '/lib/face-api/face-api.min.js';
+
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const startBtn = document.getElementById('startCamera');
+    const stopBtn = document.getElementById('stopCamera');
+    const recognitionStatus = document.getElementById('recognitionStatus');
+    const checkinStatus = document.getElementById('checkinStatus');
+    const faceRecognitionArea = document.getElementById('faceRecognitionArea');
+    const currentSessionSubject = document.getElementById('currentSessionSubject');
+    const noCameraMessage = document.getElementById('noCameraMessage');
+    const studentAvatar = document.getElementById('studentAvatar');
+
+    let stream = null;
+    let modelsLoaded = false;
+    let detectionInterval = null;
+    let currentSessionToken = null;
+    let checkInAttempted = false;
+
+    // Student's face embedding from server
+    const studentEmbedding = @Html.Raw(student.FaceEmbedding ?? "null");
+    const studentId = @student.StudentID;
+
+    async function loadModels() {
+        try {
+            recognitionStatus.innerHTML = '<div class="text-info">Loading face detection models...</div>';
+            await faceapi.nets.tinyFaceDetector.loadFromUri('/lib/face-api/weights');
+            await faceapi.nets.faceLandmark68Net.loadFromUri('/lib/face-api/weights');
+            await faceapi.nets.faceRecognitionNet.loadFromUri('/lib/face-api/weights');
+            modelsLoaded = true;
+            recognitionStatus.innerHTML = '<div class="text-success">Models loaded. Select a session to begin.</div>';
+        } catch (err) {
+            recognitionStatus.innerHTML = '<div class="text-danger">Failed to load models: ' + err.message + '</div>';
+        }
+    }
+
+    // Session selection
+    document.querySelectorAll('.select-session-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentSessionToken = btn.dataset.sessionToken;
+            const subject = btn.closest('.session-card').querySelector('.card-title').textContent;
+            currentSessionSubject.textContent = subject;
+            
+            // Hide session cards, show face recognition
+            document.querySelector('.row.g-3').style.display = 'none';
+            faceRecognitionArea.style.display = 'block';
+            
+            recognitionStatus.innerHTML = '<div class="text-success">Session selected. Click "Start Camera" to begin.</div>';
+            startBtn.disabled = false;
+            checkInAttempted = false;
+            updateCheckinStatus('waiting', 'Waiting for face scan...', 'Position your face in the camera view');
+        });
+    });
+
+    async function startCamera() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 480, facingMode: 'user' },
+                audio: false
+            });
+            video.srcObject = stream;
+            video.style.display = 'block';
+            noCameraMessage.style.display = 'none';
+            
+            await video.play();
+            
+            overlay.width = video.videoWidth;
+            overlay.height = video.videoHeight;
+            
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            recognitionStatus.innerHTML = '<div class="text-success">Camera started. Face recognition active.</div>';
+            
+            detectLoop();
+        } catch (err) {
+            recognitionStatus.innerHTML = '<div class="text-danger">Camera access denied: ' + err.message + '</div>';
+            startBtn.disabled = false;
+        }
+    }
+
+    function stopCamera() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+        if (detectionInterval) {
+            clearInterval(detectionInterval);
+            detectionInterval = null;
+        }
+        video.style.display = 'none';
+        video.srcObject = null;
+        const ctx = overlay.getContext('2d');
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        recognitionStatus.innerHTML = '<div class="text-muted">Camera stopped.</div>';
+    }
+
+    async function detectLoop() {
+        if (!stream || video.paused || video.ended) return;
+        if (checkInAttempted) return; // Stop after successful check-in
+        
+        const displaySize = { width: video.videoWidth, height: video.videoHeight };
+        faceapi.matchDimensions(overlay, displaySize);
+        
+        const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+        
+        const ctx = overlay.getContext('2d');
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+        
+        if (detection) {
+            const resized = faceapi.resizeResults(detection, displaySize);
+            faceapi.draw.drawDetections(overlay, resized);
+            faceapi.draw.drawFaceLandmarks(overlay, resized);
+            
+            const confidence = (detection.detection.score * 100).toFixed(1);
+            recognitionStatus.innerHTML = `<div class="text-success">Face detected! Confidence: ${confidence}%</div>`;
+            
+            // Verify face matches enrolled embedding
+            if (studentEmbedding && detection.descriptor) {
+                const enrolledEmbedding = studentEmbedding;
+                const currentEmbedding = Array.from(detection.descriptor);
+                const distance = calculateDistance(enrolledEmbedding, currentEmbedding);
+                
+                // Threshold for face recognition
+                const THRESHOLD = 0.6;
+                
+                if (distance < THRESHOLD && !checkInAttempted) {
+                    checkInAttempted = true;
+                    await submitAttendance(distance);
+                } else if (distance >= THRESHOLD) {
+                    recognitionStatus.innerHTML += `<div class="text-warning">Face doesn't match enrolled face (distance: ${distance.toFixed(3)}). Try adjusting position.</div>`;
+                }
+            }
+        } else {
+            recognitionStatus.innerHTML = '<div class="text-warning">No face detected. Adjust position.</div>';
+        }
+        
+        detectionInterval = requestAnimationFrame(detectLoop);
+    }
+
+    function calculateDistance(a, b) {
+        let sum = 0;
+        for (let i = 0; i < a.length; i++) {
+            const diff = a[i] - b[i];
+            sum += diff * diff;
+        }
+        return Math.sqrt(sum);
+    }
+
+    async function submitAttendance(distance) {
+        updateCheckinStatus('processing', 'Verifying face...', 'Please wait while we verify your attendance');
+        
+        try {
+            const response = await fetch('/Attendance/CheckFace', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: JSON.stringify({
+                    token: currentSessionToken,
+                    embedding: studentEmbedding
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                updateCheckinStatus('success', '✅ Check-in Successful!', result.message);
+                recognitionStatus.innerHTML = '<div class="text-success">Attendance recorded successfully!</div>';
+                
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3000);
+            } else {
+                updateCheckinStatus('error', '❌ Check-in Failed', result.message);
+                recognitionStatus.innerHTML = '<div class="text-danger">' + result.message + '</div>';
+                checkInAttempted = false; // Allow retry
+            }
+        } catch (err) {
+            updateCheckinStatus('error', '❌ Error', 'Failed to submit attendance: ' + err.message);
+            recognitionStatus.innerHTML = '<div class="text-danger">Error: ' + err.message + '</div>';
+            checkInAttempted = false;
+        }
+    }
+
+    function updateCheckinStatus(type, title, message) {
+        const icons = {
+            waiting: '⏳',
+            processing: '🔄',
+            success: '✅',
+            error: '❌'
+        };
+        
+        const colors = {
+            waiting: 'text-muted',
+            processing: 'text-info',
+            success: 'text-success',
+            error: 'text-danger'
+        };
+        
+        checkinStatus.innerHTML = `
+            <div class="display-4 ${colors[type]}">${icons[type]}</div>
+            <h4 class="${colors[type]}">${title}</h4>
+            <p class="text-muted">${message}</p>
+        `;
+    }
+
+    startBtn.addEventListener('click', startCamera);
+    stopBtn.addEventListener('click', stopCamera);
+
+    // Load models on page load
+    loadModels();
+</script>

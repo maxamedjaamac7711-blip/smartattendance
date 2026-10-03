@@ -12,9 +12,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddControllersWithViews();
 
-// Register AppDbContext (reads DefaultConnection from appsettings.json)
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "Configure ConnectionStrings:DefaultConnection before starting the application.");
+}
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(connectionString));
 
 // Use AddIdentity (not AddDefaultIdentity) - default factory adds role claims
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options => {
@@ -33,40 +39,79 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 var app = builder.Build();
 
-// Apply pending migrations and seed a default admin user for development (username: admin)
-using (var scope = app.Services.CreateScope())
+var adminUsername = builder.Configuration["AdminBootstrap:Username"];
+var adminEmail = builder.Configuration["AdminBootstrap:Email"];
+var adminPassword = builder.Configuration["AdminBootstrap:Password"];
+
+if (app.Environment.IsProduction() &&
+    (string.IsNullOrWhiteSpace(adminUsername) ||
+     string.IsNullOrWhiteSpace(adminEmail) ||
+     string.IsNullOrWhiteSpace(adminPassword)))
+{
+    throw new InvalidOperationException(
+        "Configure AdminBootstrap:Username, AdminBootstrap:Email, and AdminBootstrap:Password in production.");
+}
+
+adminUsername ??= "admin";
+adminEmail ??= "admin@example.com";
+adminPassword ??= "Admin123!";
+
+await using (var scope = app.Services.CreateAsyncScope())
 {
     var services = scope.ServiceProvider;
-    // Use the existing database (migrations were applied during development). If you want automatic migration at startup
-    // re-enable db.Database.Migrate(), but be aware of pending-model-change checks.
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-    // Ensure Admin and Teacher roles exist
     var roles = new[] { "Admin", "Teacher", "Student" };
     foreach (var r in roles)
     {
-        var exists = roleManager.RoleExistsAsync(r).GetAwaiter().GetResult();
-        if (!exists)
+        if (!await roleManager.RoleExistsAsync(r))
         {
-            roleManager.CreateAsync(new IdentityRole(r)).GetAwaiter().GetResult();
+            var result = await roleManager.CreateAsync(new IdentityRole(r));
+            if (!result.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    $"Could not create the required {r} role: {string.Join("; ", result.Errors.Select(error => error.Description))}");
+            }
         }
     }
 
     var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
-    var existing = userManager.FindByNameAsync("admin").GetAwaiter().GetResult();
+    var existing = await userManager.FindByNameAsync(adminUsername);
     if (existing == null)
     {
-        var admin = new ApplicationUser { UserName = "admin", Email = "admin@example.com", EmailConfirmed = true };
-        var result = userManager.CreateAsync(admin, "Admin123!").GetAwaiter().GetResult();
-        if (result.Succeeded)
+        existing = new ApplicationUser
         {
-            userManager.AddToRoleAsync(admin, "Admin").GetAwaiter().GetResult();
+            UserName = adminUsername,
+            Email = adminEmail,
+            EmailConfirmed = true
+        };
+        var result = await userManager.CreateAsync(existing, adminPassword);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"Could not create the configured admin user: {string.Join("; ", result.Errors.Select(error => error.Description))}");
         }
     }
     else
     {
-        if (!userManager.IsInRoleAsync(existing, "Admin").GetAwaiter().GetResult())
+        if (app.Environment.IsProduction() && !await userManager.CheckPasswordAsync(existing, adminPassword))
         {
-            userManager.AddToRoleAsync(existing, "Admin").GetAwaiter().GetResult();
+            var resetToken = await userManager.GeneratePasswordResetTokenAsync(existing);
+            var resetResult = await userManager.ResetPasswordAsync(existing, resetToken, adminPassword);
+            if (!resetResult.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    $"Could not set the configured admin password: {string.Join("; ", resetResult.Errors.Select(error => error.Description))}");
+            }
+        }
+    }
+
+    if (!await userManager.IsInRoleAsync(existing, "Admin"))
+    {
+        var result = await userManager.AddToRoleAsync(existing, "Admin");
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"Could not assign the admin role: {string.Join("; ", result.Errors.Select(error => error.Description))}");
         }
     }
 }

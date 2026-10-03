@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/.vs/
+.git/
+
+**/appsettings.Development.json
+cookies.txt
+filelist.txt
+SmartAttendanceSystem/build.log
+SmartAttendanceSystem/wwwroot/uploads/faces/

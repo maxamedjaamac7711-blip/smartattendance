@@ -8,3 +8,12 @@ cookies.txt
 filelist.txt
 SmartAttendanceSystem/build.log
 SmartAttendanceSystem/wwwroot/uploads/faces/
+SmartAttendanceSystem/appsettings.Production.json
+*.publishsettings
+*.PublishSettings
+*.pubxml
+*.pubxml.user
+.azure/
+*.bacpac
+*.bak
+*.trn

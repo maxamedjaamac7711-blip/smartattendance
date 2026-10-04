@@ -200,7 +200,7 @@
                                             <div class="d-flex align-items-center gap-2">
                                                 @if (!string.IsNullOrEmpty(item.FaceImagePath))
                                                 {
-                                                    <img src="@item.FaceImagePath" alt="@item.StudentName" class="rounded-circle border" style="width: 34px; height: 34px; object-fit: cover;" />
+                                                    <img src="@Url.Action("FaceImage", "Student", new { id = item.StudentId })" alt="@item.StudentName" class="rounded-circle border" style="width: 34px; height: 34px; object-fit: cover;" />
                                                 }
                                                 else
                                                 {

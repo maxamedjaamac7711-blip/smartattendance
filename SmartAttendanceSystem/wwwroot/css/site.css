@@ -839,3 +839,9 @@ main {
 
 /* Additional fs-7 utility */
 .fs-7 { font-size: 0.8rem !important; }
+
+.qr-code svg {
+    display: block;
+    max-width: 300px;
+    height: auto;
+}

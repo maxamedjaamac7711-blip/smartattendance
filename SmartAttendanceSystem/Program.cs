@@ -1,6 +1,9 @@
+using Azure.Identity;
+using Azure.Storage.Blobs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using SmartAttendanceSystem;
+using SmartAttendanceSystem.Services;
 using SmartAttendanceSystem.Properties.Model;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
@@ -11,6 +14,27 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddControllersWithViews();
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddSingleton<IFaceImageStorage, LocalFaceImageStorage>();
+}
+else
+{
+    var blobServiceUriValue = builder.Configuration["FaceStorage:BlobServiceUri"];
+    if (!Uri.TryCreate(blobServiceUriValue, UriKind.Absolute, out var blobServiceUri) ||
+        blobServiceUri.Scheme != Uri.UriSchemeHttps)
+    {
+        throw new InvalidOperationException(
+            "Configure FaceStorage:BlobServiceUri with the HTTPS URL of the Azure Storage account.");
+    }
+
+    var containerName = builder.Configuration["FaceStorage:ContainerName"] ?? "face-images";
+    builder.Services.AddSingleton(new BlobServiceClient(blobServiceUri, new DefaultAzureCredential()));
+    builder.Services.AddSingleton(provider =>
+        provider.GetRequiredService<BlobServiceClient>().GetBlobContainerClient(containerName));
+    builder.Services.AddSingleton<IFaceImageStorage, AzureBlobFaceImageStorage>();
+}
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -25,8 +49,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Use AddIdentity (not AddDefaultIdentity) - default factory adds role claims
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options => {
     options.SignIn.RequireConfirmedAccount = false;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase = false;
+    options.Password.RequiredLength = builder.Environment.IsDevelopment() ? 6 : 12;
+    options.Password.RequireDigit = true;
+    options.Password.RequireNonAlphanumeric = !builder.Environment.IsDevelopment();
+    options.Password.RequireUppercase = !builder.Environment.IsDevelopment();
+    options.Password.RequiredUniqueChars = builder.Environment.IsDevelopment() ? 1 : 4;
+    options.Lockout.AllowedForNewUsers = true;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+    options.Lockout.MaxFailedAccessAttempts = 5;
 })
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
@@ -35,6 +65,10 @@ builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Account/Login";
     options.AccessDeniedPath = "/Account/AccessDenied";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
 });
 
 var app = builder.Build();
@@ -43,18 +77,25 @@ var adminUsername = builder.Configuration["AdminBootstrap:Username"];
 var adminEmail = builder.Configuration["AdminBootstrap:Email"];
 var adminPassword = builder.Configuration["AdminBootstrap:Password"];
 
-if (app.Environment.IsProduction() &&
+if (!app.Environment.IsDevelopment() &&
     (string.IsNullOrWhiteSpace(adminUsername) ||
      string.IsNullOrWhiteSpace(adminEmail) ||
      string.IsNullOrWhiteSpace(adminPassword)))
 {
     throw new InvalidOperationException(
-        "Configure AdminBootstrap:Username, AdminBootstrap:Email, and AdminBootstrap:Password in production.");
+        "Configure AdminBootstrap:Username, AdminBootstrap:Email, and AdminBootstrap:Password in deployed environments.");
 }
 
-adminUsername ??= "admin";
-adminEmail ??= "admin@example.com";
-adminPassword ??= "Admin123!";
+if (app.Environment.IsDevelopment())
+{
+    adminUsername ??= "admin";
+    adminEmail ??= "admin@example.com";
+    adminPassword ??= "Admin123!";
+}
+
+var bootstrapUsername = adminUsername!;
+var bootstrapEmail = adminEmail!;
+var bootstrapPassword = adminPassword!;
 
 await using (var scope = app.Services.CreateAsyncScope())
 {
@@ -75,16 +116,16 @@ await using (var scope = app.Services.CreateAsyncScope())
     }
 
     var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
-    var existing = await userManager.FindByNameAsync(adminUsername);
+    var existing = await userManager.FindByNameAsync(bootstrapUsername);
     if (existing == null)
     {
         existing = new ApplicationUser
         {
-            UserName = adminUsername,
-            Email = adminEmail,
+            UserName = bootstrapUsername,
+            Email = bootstrapEmail,
             EmailConfirmed = true
         };
-        var result = await userManager.CreateAsync(existing, adminPassword);
+        var result = await userManager.CreateAsync(existing, bootstrapPassword);
         if (!result.Succeeded)
         {
             throw new InvalidOperationException(
@@ -93,10 +134,10 @@ await using (var scope = app.Services.CreateAsyncScope())
     }
     else
     {
-        if (app.Environment.IsProduction() && !await userManager.CheckPasswordAsync(existing, adminPassword))
+        if (!app.Environment.IsDevelopment() && !await userManager.CheckPasswordAsync(existing, bootstrapPassword))
         {
             var resetToken = await userManager.GeneratePasswordResetTokenAsync(existing);
-            var resetResult = await userManager.ResetPasswordAsync(existing, resetToken, adminPassword);
+            var resetResult = await userManager.ResetPasswordAsync(existing, resetToken, bootstrapPassword);
             if (!resetResult.Succeeded)
             {
                 throw new InvalidOperationException(

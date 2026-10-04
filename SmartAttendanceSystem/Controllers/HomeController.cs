@@ -62,6 +62,7 @@ namespace SmartAttendanceSystem.Controllers
                 .Select(a => new RecentAttendanceItem
                 {
                     AttendanceId = a.AttendanceID,
+                    StudentId = a.Student != null ? a.Student.StudentID : 0,
                     StudentName = a.Student != null ? a.Student.Name : "Unknown",
                     EnrollmentNumber = a.Student != null ? a.Student.EnrollmentNumber : "",
                     ClassName = a.Student != null && a.Student.SchoolClass != null ? a.Student.SchoolClass.Name : "N/A",

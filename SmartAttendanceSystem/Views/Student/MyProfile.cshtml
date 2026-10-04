@@ -45,7 +45,7 @@
             <div class="d-flex align-items-center gap-3 mb-4">
                 @if (!string.IsNullOrEmpty(Model.FaceImagePath))
                 {
-                    <img src="@Model.FaceImagePath" alt="@Model.Name" class="rounded-4 border border-2 border-white border-opacity-50 shadow-sm" style="width: 88px; height: 88px; object-fit: cover;" />
+                    <img src="@Url.Action("FaceImage", "Student", new { id = Model.StudentID })" alt="@Model.Name" class="rounded-4 border border-2 border-white border-opacity-50 shadow-sm" style="width: 88px; height: 88px; object-fit: cover;" />
                 }
                 else
                 {

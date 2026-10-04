@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using SmartAttendanceSystem.Models;
 using System.Text.Json;
 using System.Numerics;
+using QRCoder;
 
 namespace SmartAttendanceSystem.Controllers
 {
@@ -287,6 +288,13 @@ namespace SmartAttendanceSystem.Controllers
 
             var checkUrl = Url.Action("Check", "Attendance", new { token = session.Token }, Request.Scheme);
             ViewBag.CheckUrl = checkUrl;
+            if (!string.IsNullOrEmpty(checkUrl))
+            {
+                using var qrGenerator = new QRCodeGenerator();
+                using var qrCodeData = qrGenerator.CreateQrCode(checkUrl, QRCodeGenerator.ECCLevel.M);
+                ViewBag.QrCodeSvg = new SvgQRCode(qrCodeData).GetGraphic(6);
+            }
+
             return View(session);
         }
 
@@ -310,7 +318,7 @@ namespace SmartAttendanceSystem.Controllers
                 name = s.Name,
                 enrollment = s.EnrollmentNumber,
                 embedding = s.FaceEmbedding,
-                imagePath = s.FaceImagePath
+                imagePath = Url.Action("FaceImage", "Student", new { id = s.StudentID })
             }));
             
             return View();

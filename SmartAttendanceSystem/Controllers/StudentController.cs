@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 using System.Text.Json;
 using System.IO;
 using System.Collections.Generic;
+using SmartAttendanceSystem.Services;
 
 namespace SmartAttendanceSystem.Controllers
 {
@@ -19,11 +20,19 @@ namespace SmartAttendanceSystem.Controllers
     {
         private readonly AppDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IFaceImageStorage _faceImageStorage;
+        private readonly ILogger<StudentController> _logger;
 
-        public StudentController(AppDbContext context, UserManager<ApplicationUser> userManager)
+        public StudentController(
+            AppDbContext context,
+            UserManager<ApplicationUser> userManager,
+            IFaceImageStorage faceImageStorage,
+            ILogger<StudentController> logger)
         {
             _context = context;
             _userManager = userManager;
+            _faceImageStorage = faceImageStorage;
+            _logger = logger;
         }
 
         [Authorize(Roles = "Admin")]
@@ -188,16 +197,7 @@ namespace SmartAttendanceSystem.Controllers
             var studentName = student.Name;
             var userId = student.UserId;
 
-            // Clean up face image if exists
-            if (!string.IsNullOrEmpty(student.FaceImagePath))
-            {
-                var fullPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", student.FaceImagePath.TrimStart('/'));
-                if (System.IO.File.Exists(fullPath))
-                {
-                    try { System.IO.File.Delete(fullPath); } catch { }
-                }
-            }
-
+            var imageFileName = FaceImageFileName.FromStoredPath(student.FaceImagePath);
             // Remove attendances of student
             var attendances = await _context.Attendances.Where(a => a.StudentID == id).ToListAsync();
             _context.Attendances.RemoveRange(attendances);
@@ -212,7 +212,23 @@ namespace SmartAttendanceSystem.Controllers
                 await _userManager.DeleteAsync(user);
             }
 
-            TempData["Message"] = $"Student '{studentName}' and associated records were deleted.";
+            var imageCleanupFailed = false;
+            if (imageFileName != null)
+            {
+                try
+                {
+                    await _faceImageStorage.DeleteAsync(imageFileName);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Student {StudentId} was deleted, but its face image could not be removed.", id);
+                    imageCleanupFailed = true;
+                }
+            }
+
+            TempData["Message"] = imageCleanupFailed
+                ? $"Student '{studentName}' and associated records were deleted, but face image cleanup failed."
+                : $"Student '{studentName}' and associated records were deleted.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -233,14 +249,66 @@ namespace SmartAttendanceSystem.Controllers
 
             ViewBag.StudentId = id;
             ViewBag.StudentName = student.Name;
-            ViewBag.CurrentFaceImage = student.FaceImagePath;
+            ViewBag.CurrentFaceImage = string.IsNullOrEmpty(student.FaceImagePath)
+                ? null
+                : Url.Action(nameof(FaceImage), new { id = student.StudentID });
             ViewBag.IsEnrolled = !string.IsNullOrEmpty(student.FaceEmbedding);
             return View();
         }
 
+        [HttpGet]
+        public async Task<IActionResult> FaceImage(int id, CancellationToken cancellationToken)
+        {
+            var student = await _context.Students
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.StudentID == id, cancellationToken);
+            if (student == null)
+                return NotFound();
+
+            if (!User.IsInRole("Admin"))
+            {
+                var userId = _userManager.GetUserId(User);
+                if (User.IsInRole("Teacher"))
+                {
+                    var teacher = await _context.Teachers
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(t => t.UserId == userId, cancellationToken);
+                    if (teacher == null || teacher.ClassId != student.ClassId)
+                        return Forbid();
+                }
+                else if (User.IsInRole("Student"))
+                {
+                    var currentStudent = await _context.Students
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(s => s.UserId == userId, cancellationToken);
+                    if (currentStudent == null || currentStudent.ClassId != student.ClassId)
+                        return Forbid();
+                }
+                else
+                {
+                    return Forbid();
+                }
+            }
+
+            var fileName = FaceImageFileName.FromStoredPath(student.FaceImagePath);
+            if (fileName == null)
+                return NotFound();
+
+            var image = await _faceImageStorage.OpenReadAsync(fileName, cancellationToken);
+            if (image == null)
+                return NotFound();
+
+            Response.Headers.CacheControl = "private, no-store";
+            return File(image, "image/jpeg");
+        }
+
         [Authorize(Roles = "Admin,Student")]
         [HttpPost]
-        public async Task<IActionResult> SaveFaceEmbedding(int studentId, [FromBody] JsonElement data)
+        [RequestSizeLimit(7_500_000)]
+        public async Task<IActionResult> SaveFaceEmbedding(
+            int studentId,
+            [FromBody] JsonElement data,
+            CancellationToken cancellationToken)
         {
             var student = await _context.Students.FindAsync(studentId);
             if (student == null)
@@ -253,35 +321,98 @@ namespace SmartAttendanceSystem.Controllers
             if (!isAdmin && (currentStudent == null || currentStudent.StudentID != studentId))
                 return Forbid();
 
-            try
+            if (data.ValueKind != JsonValueKind.Object ||
+                !data.TryGetProperty("embedding", out var embeddingElement) ||
+                embeddingElement.ValueKind != JsonValueKind.Array ||
+                embeddingElement.GetArrayLength() == 0)
             {
-                var embedding = data.GetProperty("embedding").GetRawText();
-                var imageData = data.GetProperty("imageData").GetString();
+                return BadRequest(new { success = false, message = "A valid face embedding is required." });
+            }
 
-                student.FaceEmbedding = embedding;
-                
+            byte[]? imageBytes = null;
+            if (data.TryGetProperty("imageData", out var imageElement) &&
+                imageElement.ValueKind == JsonValueKind.String)
+            {
+                var imageData = imageElement.GetString();
                 if (!string.IsNullOrEmpty(imageData))
                 {
-                    var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "faces");
-                    Directory.CreateDirectory(uploadsPath);
-                    
-                    var fileName = $"student_{studentId}_{DateTime.UtcNow:yyyyMMddHHmmss}.jpg";
-                    var filePath = Path.Combine(uploadsPath, fileName);
-                    
-                    var base64Data = imageData.Split(',')[1];
-                    var imageBytes = Convert.FromBase64String(base64Data);
-                    await System.IO.File.WriteAllBytesAsync(filePath, imageBytes);
-                    
-                    student.FaceImagePath = $"/uploads/faces/{fileName}";
+                    const string dataUriPrefix = "data:image/jpeg;base64,";
+                    if (!imageData.StartsWith(dataUriPrefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return BadRequest(new { success = false, message = "The face image must be a JPEG data URL." });
+                    }
+
+                    try
+                    {
+                        imageBytes = Convert.FromBase64String(imageData[dataUriPrefix.Length..]);
+                    }
+                    catch (FormatException)
+                    {
+                        return BadRequest(new { success = false, message = "The face image data is invalid." });
+                    }
+
+                    if (imageBytes.Length == 0 ||
+                        imageBytes.Length > 5 * 1024 * 1024 ||
+                        imageBytes.Length < 3 ||
+                        imageBytes[0] != 0xFF ||
+                        imageBytes[1] != 0xD8 ||
+                        imageBytes[2] != 0xFF)
+                    {
+                        return BadRequest(new { success = false, message = "The JPEG face image is invalid or exceeds 5 MB." });
+                    }
+                }
+            }
+
+            var previousImageFileName = FaceImageFileName.FromStoredPath(student.FaceImagePath);
+            var newImageFileName = imageBytes == null
+                ? null
+                : $"student_{studentId}_{Guid.NewGuid():N}.jpg";
+
+            try
+            {
+                if (imageBytes != null && newImageFileName != null)
+                {
+                    await _faceImageStorage.SaveAsync(newImageFileName, imageBytes, cancellationToken);
+                    student.FaceImagePath = $"/uploads/faces/{newImageFileName}";
                 }
 
-                await _context.SaveChangesAsync();
-                return Ok(new { success = true, message = "Face biometrics enrolled successfully!" });
+                student.FaceEmbedding = embeddingElement.GetRawText();
+                await _context.SaveChangesAsync(cancellationToken);
             }
             catch (Exception ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                if (newImageFileName != null)
+                {
+                    try
+                    {
+                        await _faceImageStorage.DeleteAsync(newImageFileName, cancellationToken);
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        _logger.LogError(cleanupException, "Could not clean up an incomplete face image for student {StudentId}.", studentId);
+                    }
+                }
+
+                _logger.LogError(ex, "Could not save face enrollment for student {StudentId}.", studentId);
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    new { success = false, message = "Face enrollment could not be saved. Please try again." });
             }
+
+            if (previousImageFileName != null &&
+                !string.Equals(previousImageFileName, newImageFileName, StringComparison.Ordinal))
+            {
+                try
+                {
+                    await _faceImageStorage.DeleteAsync(previousImageFileName, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not remove the previous face image for student {StudentId}.", studentId);
+                }
+            }
+
+            return Ok(new { success = true, message = "Face biometrics enrolled successfully!" });
         }
 
         [Authorize(Roles = "Student,Admin")]

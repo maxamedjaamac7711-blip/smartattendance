@@ -12,8 +12,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
-ENV ASPNETCORE_HTTP_PORTS=8080 \
+ENV ASPNETCORE_ENVIRONMENT=Production \
+    ASPNETCORE_HTTP_PORTS=8080 \
     ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
 
 EXPOSE 8080
-ENTRYPOINT ["sh", "-c", "dotnet SmartAttendanceSystem.dll --urls http://0.0.0.0:${PORT:-8080}"]
+ENTRYPOINT ["sh", "-c", "exec dotnet SmartAttendanceSystem.dll --urls http://0.0.0.0:${PORT:-8080}"]

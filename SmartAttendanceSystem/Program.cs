@@ -2,6 +2,7 @@ using Azure.Identity;
 using Azure.Storage.Blobs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.HttpOverrides;
 using SmartAttendanceSystem;
 using SmartAttendanceSystem.Services;
 using SmartAttendanceSystem.Properties.Model;
@@ -15,25 +16,57 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddControllersWithViews();
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddSingleton<IFaceImageStorage, LocalFaceImageStorage>();
 }
 else
 {
+    var blobConnectionString = builder.Configuration["FaceStorage:ConnectionString"];
     var blobServiceUriValue = builder.Configuration["FaceStorage:BlobServiceUri"];
-    if (!Uri.TryCreate(blobServiceUriValue, UriKind.Absolute, out var blobServiceUri) ||
-        blobServiceUri.Scheme != Uri.UriSchemeHttps)
+    var localRootPath = builder.Configuration["FaceStorage:LocalRootPath"]
+        ?? Environment.GetEnvironmentVariable("RAILWAY_VOLUME_MOUNT_PATH");
+
+    if (!string.IsNullOrWhiteSpace(blobConnectionString))
+    {
+        builder.Services.AddSingleton(new BlobServiceClient(blobConnectionString));
+        var containerName = builder.Configuration["FaceStorage:ContainerName"] ?? "face-images";
+        builder.Services.AddSingleton(provider =>
+            provider.GetRequiredService<BlobServiceClient>().GetBlobContainerClient(containerName));
+        builder.Services.AddSingleton<IFaceImageStorage, AzureBlobFaceImageStorage>();
+    }
+    else if (!string.IsNullOrWhiteSpace(blobServiceUriValue))
+    {
+        if (!Uri.TryCreate(blobServiceUriValue, UriKind.Absolute, out var blobServiceUri) ||
+            blobServiceUri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException(
+                "Configure FaceStorage:BlobServiceUri with the HTTPS URL of the Azure Storage account.");
+        }
+
+        builder.Services.AddSingleton(new BlobServiceClient(blobServiceUri, new DefaultAzureCredential()));
+        var containerName = builder.Configuration["FaceStorage:ContainerName"] ?? "face-images";
+        builder.Services.AddSingleton(provider =>
+            provider.GetRequiredService<BlobServiceClient>().GetBlobContainerClient(containerName));
+        builder.Services.AddSingleton<IFaceImageStorage, AzureBlobFaceImageStorage>();
+    }
+    else if (!string.IsNullOrWhiteSpace(localRootPath))
+    {
+        builder.Services.AddSingleton<IFaceImageStorage, LocalFaceImageStorage>();
+    }
+    else
     {
         throw new InvalidOperationException(
-            "Configure FaceStorage:BlobServiceUri with the HTTPS URL of the Azure Storage account.");
+            "Configure FaceStorage:ConnectionString or FaceStorage:BlobServiceUri, or attach a persistent volume and set RAILWAY_VOLUME_MOUNT_PATH.");
     }
-
-    var containerName = builder.Configuration["FaceStorage:ContainerName"] ?? "face-images";
-    builder.Services.AddSingleton(new BlobServiceClient(blobServiceUri, new DefaultAzureCredential()));
-    builder.Services.AddSingleton(provider =>
-        provider.GetRequiredService<BlobServiceClient>().GetBlobContainerClient(containerName));
-    builder.Services.AddSingleton<IFaceImageStorage, AzureBlobFaceImageStorage>();
 }
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -159,6 +192,8 @@ await using (var scope = app.Services.CreateAsyncScope())
 
 
 // Configure the HTTP request pipeline.
+app.UseForwardedHeaders();
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");

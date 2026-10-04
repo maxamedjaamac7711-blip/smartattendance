@@ -3,6 +3,14 @@
 **/.vs/
 .git/
 
+*.publishsettings
+*.PublishSettings
+*.pubxml
+*.pubxml.user
+*.bacpac
+*.bak
+*.trn
+
 **/appsettings.Development.json
 cookies.txt
 filelist.txt

@@ -24,6 +24,69 @@ The repository includes `.github/workflows/azure-webapp.yml`. A push to `main`
 builds the existing ASP.NET Core project and deploys it to Azure App Service.
 No database migration is run automatically at application startup.
 
+Azure continues to use its existing managed-identity Blob Storage configuration
+(`FaceStorage__BlobServiceUri` and `FaceStorage__ContainerName`).
+`FaceStorage__ConnectionString`, when explicitly set, selects connection-string
+authentication for Azure Blob Storage; it is intended for services such as
+Railway and must be stored only in deployment variables.
+
+## Railway deployment (alternative)
+
+The root `Dockerfile` is used for Railway's automatic Dockerfile build. It
+binds Kestrel to Railway's runtime `PORT`; forwarded host/protocol headers are
+enabled for HTTPS redirects and secure authentication cookies behind Railway's
+reverse proxy. Railway terminates public HTTPS and forwards one proxy hop; the
+app trusts one forwarded `X-Forwarded-For`/`X-Forwarded-Proto` hop to restore
+the public request scheme. `AllowedHosts` is not disabled. The Azure workflow
+and Azure Blob managed-identity configuration remain available.
+
+The application is SQL Server-specific (`UseSqlServer`, SQL Server EF
+migrations, SQL Server identity schema). Railway's PostgreSQL service is not a
+drop-in database. To keep the current application and schema unchanged, use a
+reachable remote SQL Server and supply its connection string. Do not supply
+Railway PostgreSQL variables to this version of the app.
+
+Set these Railway service variables:
+
+| Variable | Value |
+| --- | --- |
+| `ASPNETCORE_ENVIRONMENT` | `Production` |
+| `ConnectionStrings__DefaultConnection` | Remote SQL Server connection string |
+| `AdminBootstrap__Username` | Production admin username |
+| `AdminBootstrap__Email` | Production admin email |
+| `AdminBootstrap__Password` | Unique strong password |
+| `FaceStorage__ConnectionString` | Azure Storage connection string (secret), if using Azure Blob |
+| `FaceStorage__ContainerName` | Private Azure Blob container, default `face-images` |
+
+Choose one face-image storage configuration:
+
+- **Azure Blob (recommended):** set `FaceStorage__ConnectionString` and
+  `FaceStorage__ContainerName`. This branch takes precedence over Azure
+  managed-identity settings and works with a storage-account connection
+  string kept in Railway Variables.
+- **Railway Volume:** attach a volume to the service mounted at `/app/data`.
+  Railway provides `RAILWAY_VOLUME_MOUNT_PATH`; the app stores face photos
+  under `<mount path>/uploads/faces`. This is persistent but volume files are
+  instance/region scoped; back them up and do not scale this service to
+  multiple replicas without shared storage.
+
+Keep `Dockerfile Path` at its repository-root default (`Dockerfile`) and
+`Docker Command` at the image default. In Railway's **Networking** settings,
+generate a public domain for the service. Do not set an application port
+manually: the container reads Railway's injected `PORT`.
+
+Migrate `SmartAttendanceDB` to a remotely reachable SQL Server before first
+start and apply the reviewed EF Core migration script separately. Local SQL
+Server at `.` / `localhost` and Windows integrated authentication do not work
+inside Railway. Configure firewall rules to allow Railway egress, or use a SQL
+Server host/network reachable from the Railway service.
+
+After setting variables, deploy the `main` branch from the GitHub repository.
+Use Railway's deploy logs to troubleshoot startup, SQL connectivity, and Blob
+authorization. Check the generated `https://...up.railway.app` domain, then
+test login, roles, QR check-in, face enrollment/check-in, and browser camera
+permissions. Camera access requires HTTPS.
+
 ### 1. Create Azure SQL Database and preserve existing data
 
 1. In the Azure Portal, create a logical SQL server. Keep it in the same region

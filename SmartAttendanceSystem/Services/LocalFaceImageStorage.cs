@@ -4,9 +4,11 @@ public sealed class LocalFaceImageStorage : IFaceImageStorage
 {
     private readonly string _webRootPath;
 
-    public LocalFaceImageStorage(IWebHostEnvironment environment)
+    public LocalFaceImageStorage(IWebHostEnvironment environment, IConfiguration configuration)
     {
-        _webRootPath = environment.WebRootPath
+        _webRootPath = configuration["FaceStorage:LocalRootPath"]
+            ?? Environment.GetEnvironmentVariable("RAILWAY_VOLUME_MOUNT_PATH")
+            ?? environment.WebRootPath
             ?? Path.Combine(environment.ContentRootPath, "wwwroot");
     }
 

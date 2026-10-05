@@ -77,7 +77,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseNpgsql(connectionString));
 
 // Use AddIdentity (not AddDefaultIdentity) - default factory adds role claims
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options => {
@@ -133,6 +133,7 @@ var bootstrapPassword = adminPassword!;
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var services = scope.ServiceProvider;
+    await services.GetRequiredService<AppDbContext>().Database.MigrateAsync();
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
     var roles = new[] { "Admin", "Teacher", "Student" };
     foreach (var r in roles)

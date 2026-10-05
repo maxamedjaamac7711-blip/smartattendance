@@ -6,6 +6,7 @@
 
 cookies.txt
 filelist.txt
+build.log
 SmartAttendanceSystem/build.log
 SmartAttendanceSystem/wwwroot/uploads/faces/
 SmartAttendanceSystem/appsettings.Production.json

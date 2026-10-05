@@ -20,7 +20,7 @@ namespace SmartAttendanceSystem
             var conn = config.GetConnectionString("DefaultConnection");
 
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-            optionsBuilder.UseSqlServer(conn);
+            optionsBuilder.UseNpgsql(conn);
 
             return new AppDbContext(optionsBuilder.Options);
         }

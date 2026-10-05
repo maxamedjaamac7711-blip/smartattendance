@@ -27,8 +27,9 @@ No database migration is run automatically at application startup.
 Azure continues to use its existing managed-identity Blob Storage configuration
 (`FaceStorage__BlobServiceUri` and `FaceStorage__ContainerName`).
 `FaceStorage__ConnectionString`, when explicitly set, selects connection-string
-authentication for Azure Blob Storage; it is intended for services such as
-Railway and must be stored only in deployment variables.
+authentication for Azure Blob Storage; it can be used by non-Azure hosting
+services such as Railway or Render and must be stored only in deployment
+variables.
 
 ## Railway deployment (alternative)
 
@@ -86,6 +87,50 @@ Use Railway's deploy logs to troubleshoot startup, SQL connectivity, and Blob
 authorization. Check the generated `https://...up.railway.app` domain, then
 test login, roles, QR check-in, face enrollment/check-in, and browser camera
 permissions. Camera access requires HTTPS.
+
+## Render deployment (alternative)
+
+Render can build this repository with its existing root `Dockerfile`. Create a
+**Web Service** from the GitHub repository, select the `main` branch and
+**Docker** runtime, and leave the Dockerfile path at `Dockerfile`. The Docker
+entrypoint listens on Render's injected `PORT`; no separate start command or
+manually configured port is required. The image sets
+`ASPNETCORE_ENVIRONMENT=Production` and enables forwarded HTTPS handling.
+
+Add these service environment variables in Render:
+
+| Variable | Value |
+| --- | --- |
+| `ConnectionStrings__DefaultConnection` | Connection string for a remotely reachable SQL Server |
+| `AdminBootstrap__Username` | Production admin username |
+| `AdminBootstrap__Email` | Production admin email |
+| `AdminBootstrap__Password` | Unique strong password |
+| `FaceStorage__ConnectionString` | Azure Storage connection string, marked secret |
+| `FaceStorage__ContainerName` | Private Azure Blob container name; defaults to `face-images` |
+
+Keep face photos in a private Azure Blob container. Render's ordinary service
+filesystem is ephemeral, and this application intentionally fails startup in
+Production if neither Azure Blob configuration nor an explicit local storage
+path is provided. Do not set `FaceStorage__LocalRootPath` on Render. Azure
+managed identity (`FaceStorage__BlobServiceUri`) is for Azure-hosted services;
+use the secret Blob connection string on Render instead. Do not make the Blob
+container public.
+
+The application requires SQL Server and EF Core's SQL Server provider;
+Render's PostgreSQL is not a compatible database. Use a reachable remote SQL
+Server (Azure SQL is one option), set its connection string as a Render secret,
+and apply the reviewed EF migration script separately before the first deploy.
+The local SQL Server connection and Windows integrated authentication do not
+work on Render. Ensure the SQL Server firewall/network allows connections from
+the Render service.
+
+After saving the variables, deploy the service and generate/enable its public
+`onrender.com` domain. Render supplies the listening `PORT`; the reverse proxy
+terminates HTTPS and forwards the scheme used by the app for redirects and
+secure authentication cookies. Test login, role access, QR check-in, face
+enrollment/check-in, and grant camera access in the public HTTPS URL. Use the
+Render service's **Logs** page to diagnose container startup, SQL, or Blob
+Storage errors. Database migrations are not applied automatically.
 
 ### 1. Create Azure SQL Database and preserve existing data
 
